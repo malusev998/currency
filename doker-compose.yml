@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  mongo:
+    image: mongo:4.4.1-bionic
+    ports:
+      - 27017:27017
+    networks:
+      - currency
+    restart: unless-stopped
+networks:
+  currency:
+    driver: bridge
