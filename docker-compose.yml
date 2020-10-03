@@ -7,7 +7,7 @@ services:
     networks:
       - currency
     volumes:
-      - currency:/data/db
+      - mongo_currency:/data/db
     restart: unless-stopped
   mysql:
     image: mysql:8
@@ -16,14 +16,16 @@ services:
     networks:
       - currency
     volumes:
-      - currency:/var/lib/mysql
+      - mysql_currency:/var/lib/mysql
     environment:
-      MYSQL_ROOT_PASSWORD: currency
+      MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: currencydb
     restart: unless-stopped
 networks:
   currency:
     driver: bridge
 volumes:
-  currency:
+  mongo_currency:
+    driver: local
+  mysql_currency:
     driver: local
