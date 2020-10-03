@@ -1,0 +1,29 @@
+version: '3.4'
+services:
+  mongo:
+    image: mongo:4.4.1-bionic
+    ports:
+      - 27017:27017
+    networks:
+      - currency
+    volumes:
+      - currency:/data/db
+    restart: unless-stopped
+  mysql:
+    image: mysql:8
+    ports:
+      - 3306:3306
+    networks:
+      - currency
+    volumes:
+      - currency:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: currency
+      MYSQL_DATABASE: currencydb
+    restart: unless-stopped
+networks:
+  currency:
+    driver: bridge
+volumes:
+  currency:
+    driver: local
