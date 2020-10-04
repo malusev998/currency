@@ -10,7 +10,7 @@ services:
       - mongo_currency:/data/db
     restart: unless-stopped
   mysql:
-    image: mysql:8
+    image: mariadb:10.5.5-focal
     ports:
       - 3306:3306
     networks:
@@ -18,8 +18,11 @@ services:
     volumes:
       - mysql_currency:/var/lib/mysql
     environment:
-      MYSQL_ROOT_PASSWORD: password
+      MYSQL_RANDOM_ROOT_PASSWORD: generate-random-password
+      MYSQL_USER: currency
+      MYSQL_PASSWORD: currency
       MYSQL_DATABASE: currencydb
+      MYSQL_ROOT_HOST: '%'
     restart: unless-stopped
 networks:
   currency:

@@ -45,7 +45,7 @@ func TestMysqlStorage_Store(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	asserts := require.New(t)
-	db, err := sql.Open("mysql", "root:password@/currencydb")
+	db, err := sql.Open("mysql", "currency:currency@/currencydb")
 
 	asserts.NotNil(db)
 	asserts.Nil(err)
