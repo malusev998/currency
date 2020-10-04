@@ -13,9 +13,21 @@ import (
 )
 
 type (
-	httpHandler struct{}
+	httpHandler             struct{}
 	httpHandlerLimitReached struct{}
+	httpClientError         struct{}
+	httpServerError         struct{}
 )
+
+func (h httpServerError) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	writer.WriteHeader(503)
+	writer.Write([]byte("{\"error\": \"On vacation\", \"status\": 503}"))
+}
+
+func (h httpClientError) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	writer.WriteHeader(422)
+	writer.Write([]byte("{\"error\": \"Validation error.\", \"status\": 422}"))
+}
 
 func (h httpHandlerLimitReached) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 	writer.WriteHeader(400)
@@ -72,7 +84,6 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 		}
 	})
 
-
 	t.Run("API key not found", func(t *testing.T) {
 		asserts := require.New(t)
 		fetcher := FreeCurrConvFetcher{
@@ -82,13 +93,12 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 			MaxPerRequest: 2,
 		}
 
-		currencies, err := fetcher.Fetch( []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
+		currencies, err := fetcher.Fetch([]string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
 
 		asserts.Nil(currencies)
 		asserts.NotNil(err)
 		asserts.True(errors.Is(err, ErrUnAuthorized))
 	})
-
 
 	t.Run("Not enough requests", func(t *testing.T) {
 		asserts := require.New(t)
@@ -105,7 +115,6 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 		asserts.True(errors.Is(err, ErrNotEnoughRequests))
 	})
 }
-
 
 func TestApiLimitReached(t *testing.T) {
 	t.Parallel()
@@ -126,4 +135,46 @@ func TestApiLimitReached(t *testing.T) {
 	asserts.Nil(currencies)
 	asserts.NotNil(err)
 	asserts.True(errors.Is(err, ErrApiLimitReached))
+}
+
+func TestClientError(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewUnstartedServer(httpClientError{})
+	server.Start()
+	defer server.Close()
+
+	asserts := require.New(t)
+	fetcher := FreeCurrConvFetcher{
+		Url:           server.URL,
+		ApiKey:        "1234567890",
+		MaxPerHour:    300,
+		MaxPerRequest: 2,
+	}
+
+	currencies, err := fetcher.Fetch([]string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
+
+	asserts.Nil(currencies)
+	asserts.NotNil(err)
+	asserts.True(errors.Is(err, ErrClient))
+}
+
+func TestServerError(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewUnstartedServer(httpServerError{})
+	server.Start()
+	defer server.Close()
+
+	asserts := require.New(t)
+	fetcher := FreeCurrConvFetcher{
+		Url:           server.URL,
+		ApiKey:        "1234567890",
+		MaxPerHour:    300,
+		MaxPerRequest: 2,
+	}
+
+	currencies, err := fetcher.Fetch([]string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
+
+	asserts.Nil(currencies)
+	asserts.NotNil(err)
+	asserts.True(errors.Is(err, ErrServer))
 }
