@@ -48,10 +48,8 @@ func (h httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request
 func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewUnstartedServer(httpHandler{})
-	server.EnableHTTP2 = true
 	server.Start()
 	defer server.Close()
-	client := server.Client()
 	t.Run("Retrieves data from API", func(t *testing.T) {
 		asserts := require.New(t)
 		required := []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"}
@@ -60,11 +58,9 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 			ApiKey:        "1234566789",
 			MaxPerHour:    300,
 			MaxPerRequest: 2,
-			Currencies:    required,
-			Client:        client,
 		}
 
-		currencies, err := fetcher.Fetch()
+		currencies, err := fetcher.Fetch(required)
 
 		asserts.Nilf(err, "Error while fetching currencies: %v", err)
 		asserts.Lenf(currencies, 4, "Not enough currencies returned: %d", len(currencies))
@@ -84,11 +80,9 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 			ApiKey:        "",
 			MaxPerHour:    300,
 			MaxPerRequest: 2,
-			Currencies:    []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"},
-			Client:        client,
 		}
 
-		currencies, err := fetcher.Fetch()
+		currencies, err := fetcher.Fetch( []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
 
 		asserts.Nil(currencies)
 		asserts.NotNil(err)
@@ -103,10 +97,8 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 			ApiKey:        "",
 			MaxPerHour:    1,
 			MaxPerRequest: 2,
-			Currencies:    []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"},
-			Client:        client,
 		}
-		currencies, err := fetcher.Fetch()
+		currencies, err := fetcher.Fetch([]string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
 
 		asserts.Nil(currencies)
 		asserts.NotNil(err)
@@ -118,10 +110,8 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 func TestApiLimitReached(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewUnstartedServer(httpHandlerLimitReached{})
-	server.EnableHTTP2 = true
 	server.Start()
 	defer server.Close()
-	client := server.Client()
 
 	asserts := require.New(t)
 	fetcher := FreeCurrConvFetcher{
@@ -129,11 +119,9 @@ func TestApiLimitReached(t *testing.T) {
 		ApiKey:        "1234567890",
 		MaxPerHour:    300,
 		MaxPerRequest: 2,
-		Currencies:    []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"},
-		Client:        client,
 	}
 
-	currencies, err := fetcher.Fetch()
+	currencies, err := fetcher.Fetch([]string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"})
 
 	asserts.Nil(currencies)
 	asserts.NotNil(err)

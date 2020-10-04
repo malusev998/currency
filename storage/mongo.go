@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const MongoDBProviderName = "mongodb"
+
 type mongoStorage struct {
 	ctx        context.Context
 	collection *mongo.Collection
@@ -73,26 +75,42 @@ func (m mongoStorage) GetByDateAndProvider(from, to, provider string, start, end
 	return currencies, nil
 }
 
-func (m mongoStorage) Store(currency currency_fetcher.Currency) (currency_fetcher.CurrencyWithId, error) {
-	if currency.CreatedAt.IsZero() {
-		currency.CreatedAt = time.Now()
+func (m mongoStorage) Store(currency []currency_fetcher.Currency) ([]currency_fetcher.CurrencyWithId, error) {
+	currenciesToInsert := make([]interface{}, 0, len(currency))
+
+	for _, cur := range currency {
+		createdAt := cur.CreatedAt
+		if createdAt.IsZero() {
+			createdAt = time.Now()
+		}
+
+		currenciesToInsert = append(currenciesToInsert, bson.M{
+			"currency":  fmt.Sprintf("%s_%s", cur.From, cur.To),
+			"rate":      cur.Rate,
+			"provider":  cur.Provider,
+			"createdAt": createdAt,
+		})
 	}
 
-	result, err := m.collection.InsertOne(m.ctx, bson.M{
-		"currency":  fmt.Sprintf("%s_%s", currency.From, currency.To),
-		"rate":      currency.Rate,
-		"provider":  currency.Provider,
-		"createdAt": currency.CreatedAt,
-	})
+	results, err := m.collection.InsertMany(m.ctx, currenciesToInsert)
 
 	if err != nil {
-		return currency_fetcher.CurrencyWithId{}, err
+		return nil, err
 	}
 
-	return currency_fetcher.CurrencyWithId{
-		Currency: currency,
-		Id:       result.InsertedID,
-	}, nil
+	data := make([]currency_fetcher.CurrencyWithId, 0, len(results.InsertedIDs))
+	for i, result := range results.InsertedIDs {
+		data = append(data, currency_fetcher.CurrencyWithId{
+			Currency: currency[i],
+			Id:       result,
+		})
+	}
+
+	return data, nil
+}
+
+func (mongoStorage) GetStorageProviderName() string {
+	return MongoDBProviderName
 }
 
 func NewMongoStorage(ctx context.Context, collection *mongo.Collection) currency_fetcher.Storage {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/BrosSquad/currency-fetcher"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"math/rand"
@@ -26,24 +27,62 @@ func TestStoreInMongo(t *testing.T) {
 
 	defer client.Disconnect(ctx)
 
-	database := client.Database("currency_fetcher_store")
-	defer database.Drop(ctx)
-	collection := database.Collection("currency")
-	storage := NewMongoStorage(ctx, collection)
+	t.Run("StoreOne", func(t *testing.T) {
+		database := client.Database("currency_fetcher_store_one")
+		defer database.Drop(ctx)
+		collection := database.Collection("currency")
+		storage := NewMongoStorage(ctx, collection)
 
-	currency, err := storage.Store(currency_fetcher.Currency{
-		From:     "EUR",
-		To:       "USD",
-		Provider: "TestProvider",
-		Rate:     0.8,
+		currencies, err := storage.Store([]currency_fetcher.Currency{
+			{
+				From:     "EUR",
+				To:       "USD",
+				Provider: "TestProvider",
+				Rate:     0.8,
+			},
+		})
+
+		asserts.Nil(err)
+		asserts.Len(currencies, 1)
+		asserts.NotNil(currencies[0].Id)
+		asserts.Equal("EUR", currencies[0].From)
+		asserts.Equal("USD", currencies[0].To)
+		asserts.Equal("TestProvider", currencies[0].Provider)
+		asserts.Equal(float32(0.8), currencies[0].Rate)
 	})
 
-	asserts.Nil(err)
-	asserts.NotNil(currency.Id)
-	asserts.Equal("EUR", currency.From)
-	asserts.Equal("USD", currency.To)
-	asserts.Equal("TestProvider", currency.Provider)
-	asserts.Equal(float32(0.8), currency.Rate)
+	t.Run("StoreMany", func(t *testing.T) {
+		database := client.Database("currency_fetcher_store_many")
+		defer database.Drop(ctx)
+		collection := database.Collection("currency")
+		storage := NewMongoStorage(ctx, collection)
+
+		currencies, err := storage.Store([]currency_fetcher.Currency{
+			{
+				From:     "EUR",
+				To:       "USD",
+				Provider: "TestProvider",
+				Rate:     0.8,
+				CreatedAt: time.Now().Add(time.Duration(10) * time.Minute),
+			},
+			{
+				From:     "EUR",
+				To:       "USD",
+				Provider: "TestProvider",
+				Rate:     0.8,
+			},
+		})
+
+		asserts.Nil(err)
+		asserts.Len(currencies, 2)
+		for _, cur := range currencies {
+			asserts.NotNil(cur.Id)
+			asserts.Equal("EUR", cur.From)
+			asserts.Equal("USD", cur.To)
+			asserts.Equal("TestProvider", cur.Provider)
+			asserts.Equal(float32(0.8), cur.Rate)
+		}
+	})
 }
 
 func TestGetCurrenciesFromMongoDb(t *testing.T) {
@@ -87,6 +126,8 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 		asserts.Len(currencies, 10)
 
 		for _, cur := range currencies {
+			asserts.NotNil(cur.Id)
+			asserts.IsType(primitive.ObjectID{}, cur.Id)
 			asserts.Equal("TestProvider", cur.Provider)
 			asserts.Equal("EUR", cur.From)
 			asserts.Equal("USD", cur.To)

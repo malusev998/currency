@@ -1,5 +1,5 @@
 package currency_fetcher
 
 type Fetcher interface {
-	Fetch() []Currency
+	Fetch(currenciesToFetch []string) ([]Currency, error)
 }

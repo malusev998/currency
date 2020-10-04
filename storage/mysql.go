@@ -3,80 +3,101 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/BrosSquad/currency-fetcher"
+	"github.com/google/uuid"
+	"strings"
 	"time"
 )
 
-type mysqlStorage struct {
-	ctx       context.Context
-	db        *sql.DB
-	tableName string
-}
+const MySQLStorageProviderName = "mysql"
 
-func NewMySQLStorage(ctx context.Context, db *sql.DB, tableName string) currency_fetcher.Storage {
+var ErrNotEnoughBytesInGenerator = errors.New("id generator must return byte slice with 16 bytes in it")
+
+type (
+	IdGenerator interface {
+		Generate() []byte
+	}
+	mysqlStorage struct {
+		idGenerator IdGenerator
+		ctx         context.Context
+		db          *sql.DB
+		tableName   string
+	}
+)
+
+
+func NewMySQLStorage(ctx context.Context, db *sql.DB, tableName string, generator IdGenerator) currency_fetcher.Storage {
 	return mysqlStorage{
-		ctx:       ctx,
-		db:        db,
-		tableName: tableName,
+		idGenerator: generator,
+		ctx:         ctx,
+		db:          db,
+		tableName:   tableName,
 	}
 }
 
-func (m mysqlStorage) Store(currency currency_fetcher.Currency) (currency_fetcher.CurrencyWithId, error) {
-	if currency.CreatedAt.IsZero() {
-		currency.CreatedAt = time.Now()
-	}
-
-	combinedCurrency := fmt.Sprintf("%s_%s", currency.From, currency.To)
-
+func (m mysqlStorage) Store(currency []currency_fetcher.Currency) ([]currency_fetcher.CurrencyWithId, error) {
 	tx, err := m.db.Begin()
 
 	if err != nil {
-		return currency_fetcher.CurrencyWithId{}, err
+		return nil, err
 	}
 
-	stmt, err := tx.PrepareContext(m.ctx, fmt.Sprintf("INSERT INTO %s(currency, provider, rate, created_at) VALUES(?,?,?,?);", m.tableName))
+	var builder strings.Builder
+	bind := make([]interface{}, 0, 5*len(currency))
+	data := make([]currency_fetcher.CurrencyWithId, 0, len(currency))
+	for _, cur := range currency {
+		var id uuid.UUID
+		if m.idGenerator == nil {
+			id = uuid.New()
+		} else {
+			bytes := m.idGenerator.Generate()
+			if bytes == nil || len(bytes) != 16 {
+				return nil, ErrNotEnoughBytesInGenerator
+			}
+			id, err = uuid.FromBytes(m.idGenerator.Generate())
+			if err != nil {
+				return nil, err
+			}
+		}
+		createdAt := cur.CreatedAt
+		if createdAt.IsZero() {
+			createdAt = time.Now()
+		}
+		builder.WriteString("(?,?,?,?,?),")
+		bind = append(bind, id, fmt.Sprintf("%s_%s", cur.From, cur.To), cur.Provider, cur.Rate, createdAt)
+		data = append(data, currency_fetcher.CurrencyWithId{
+			Currency: cur,
+			Id:       id,
+		})
+	}
+
+	stmt, err := tx.PrepareContext(m.ctx, fmt.Sprintf("INSERT INTO %s(id, currency, provider, rate, created_at) VALUES %s;", m.tableName, strings.TrimRight(builder.String(), ", ")))
 
 	if err != nil {
 		_ = tx.Rollback()
-		return currency_fetcher.CurrencyWithId{}, err
+		return nil, err
 	}
 
-	_, err = stmt.ExecContext(m.ctx, combinedCurrency, currency.Provider, currency.Rate, currency.CreatedAt)
+	_, err = stmt.ExecContext(m.ctx, bind...)
 
 	if err != nil {
 		_ = tx.Rollback()
-		return currency_fetcher.CurrencyWithId{}, err
-	}
-
-	stmt, err = tx.PrepareContext(m.ctx, fmt.Sprintf("SELECT id FROM %s WHERE currency = ? AND provider = ? AND rate = ? AND created_at = ? LIMIT 1;", m.tableName))
-
-	if err != nil {
-		return currency_fetcher.CurrencyWithId{}, err
-	}
-
-	var id uint64
-	row := stmt.QueryRowContext(m.ctx, combinedCurrency, currency.Provider, currency.Rate, currency.CreatedAt)
-
-	if err := row.Scan(&id); err != nil {
-		_ = tx.Rollback()
-		return currency_fetcher.CurrencyWithId{}, err
+		return nil, err
 	}
 
 	if err := stmt.Close(); err != nil {
 		_ = tx.Rollback()
-		return currency_fetcher.CurrencyWithId{}, err
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
 		_ = tx.Rollback()
-		return currency_fetcher.CurrencyWithId{}, err
+		return nil, err
 	}
 
-	return currency_fetcher.CurrencyWithId{
-		Currency: currency,
-		Id: id,
-	}, nil
+	return data, nil
 }
 
 func (m mysqlStorage) Get(from, to string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
@@ -93,4 +114,8 @@ func (m mysqlStorage) GetByDate(from, to string, start, end time.Time, page, per
 
 func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
 	panic("implement me")
+}
+
+func (mysqlStorage) GetStorageProviderName() string {
+	return MySQLStorageProviderName
 }

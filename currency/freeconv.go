@@ -29,8 +29,6 @@ type FreeCurrConvFetcher struct {
 	ApiKey        string
 	MaxPerHour    int
 	MaxPerRequest int
-	Currencies    []string
-	Client        *http.Client
 }
 
 func (f FreeCurrConvFetcher) getData(url string, currencies []string) (*http.Request, error) {
@@ -84,7 +82,7 @@ func appendToCurrencies(wg *sync.WaitGroup, c <-chan map[string]float32, currenc
 	}
 }
 
-func (f FreeCurrConvFetcher) fetchCurrencies(wg *sync.WaitGroup, currencies []string, channel chan<- map[string]float32, errorChannel chan<- error) {
+func (f FreeCurrConvFetcher) fetchCurrencies(client *http.Client, wg *sync.WaitGroup, currencies []string, channel chan<- map[string]float32, errorChannel chan<- error) {
 	defer wg.Done()
 	url := f.Url
 
@@ -99,7 +97,7 @@ func (f FreeCurrConvFetcher) fetchCurrencies(wg *sync.WaitGroup, currencies []st
 		return
 	}
 
-	res, err := f.Client.Do(req)
+	res, err := client.Do(req)
 
 	if err != nil {
 		errorChannel <- err
@@ -150,17 +148,18 @@ func (f FreeCurrConvFetcher) fetchCurrencies(wg *sync.WaitGroup, currencies []st
 	errorChannel <- ErrUnknown
 }
 
-func (f FreeCurrConvFetcher) Fetch() ([]currency_fetcher.Currency, error) {
-	numberOfRequests := len(f.Currencies) / f.MaxPerRequest
+func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currency_fetcher.Currency, error) {
+	numberOfRequests := len(currenciesToFetch) / f.MaxPerRequest
 	if numberOfRequests >= f.MaxPerHour {
 		return nil, ErrNotEnoughRequests
 	}
 
 	channel := make(chan map[string]float32, numberOfRequests)
 	errorChannel := make(chan error)
-	currencies := make([]currency_fetcher.Currency, 0, len(f.Currencies))
+	currencies := make([]currency_fetcher.Currency, 0, len(currenciesToFetch))
 	var wg sync.WaitGroup
 	var appendWg sync.WaitGroup
+	client := &http.Client{}
 
 	appendWg.Add(1)
 	go appendToCurrencies(&appendWg, channel, &currencies)
@@ -168,7 +167,7 @@ func (f FreeCurrConvFetcher) Fetch() ([]currency_fetcher.Currency, error) {
 	idx := 0
 	for i := 0; i < numberOfRequests; i++ {
 		wg.Add(1)
-		go f.fetchCurrencies(&wg, f.Currencies[idx:idx+f.MaxPerRequest], channel, errorChannel)
+		go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+f.MaxPerRequest], channel, errorChannel)
 		idx += f.MaxPerRequest
 	}
 
