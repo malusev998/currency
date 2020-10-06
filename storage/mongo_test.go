@@ -8,15 +8,29 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestStoreInMongo(t *testing.T) {
+	runningInDocker := false
+
+	if os.Getenv("RUNNING_IN_DOCKER") != "" {
+		runningInDocker = true
+	}
+
 	t.Parallel()
 	ctx := context.Background()
 	asserts := require.New(t)
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
+
+	uri := "mongodb://localhost:27017"
+
+	if runningInDocker {
+		uri = "mongodb://mongo:27017"
+	}
+
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 
 	asserts.Nil(err)
 	asserts.NotNil(client)

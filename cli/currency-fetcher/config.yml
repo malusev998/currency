@@ -18,6 +18,7 @@ databases:
     uri: mongodb://localhost:27017
     db: currencydb
     collection: currency
+migrate: true
 currencies:
   - EUR_USD
   - USD_EUR

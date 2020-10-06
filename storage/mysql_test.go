@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 	"time"
 )
@@ -43,9 +44,21 @@ func (i *IdGeneratorMock) Generate() []byte {
 
 func TestMysqlStorage_Store(t *testing.T) {
 	t.Parallel()
+	runningInDocker := false
+
+	if os.Getenv("RUNNING_IN_DOCKER") != "" {
+		runningInDocker = true
+	}
+
 	ctx := context.Background()
 	asserts := require.New(t)
-	db, err := sql.Open("mysql", "currency:currency@/currencydb")
+	uri := "currency:currency@/currencydb"
+
+	if runningInDocker {
+		uri = "currency:currency@mysql:3306/currencydb"
+	}
+
+	db, err := sql.Open("mysql", uri)
 
 	asserts.NotNil(db)
 	asserts.Nil(err)
