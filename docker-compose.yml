@@ -5,18 +5,18 @@ services:
     ports:
       - 27017:27017
     networks:
-      - currency
+      - currency_fetcher
     volumes:
-      - mongo_currency:/data/db
+      - mongo_currency_fetcher:/data/db
     restart: unless-stopped
   mysql:
     image: mariadb:10.5.5-focal
     ports:
       - 3306:3306
     networks:
-      - currency
+      - currency_fetcher
     volumes:
-      - mysql_currency:/var/lib/mysql
+      - mysql_currency_fetcher:/var/lib/mysql
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: generate-random-password
       MYSQL_USER: currency
@@ -25,10 +25,10 @@ services:
       MYSQL_ROOT_HOST: '%'
     restart: unless-stopped
 networks:
-  currency:
+  currency_fetcher:
     driver: bridge
 volumes:
-  mongo_currency:
+  mongo_currency_fetcher:
     driver: local
-  mysql_currency:
+  mysql_currency_fetcher:
     driver: local

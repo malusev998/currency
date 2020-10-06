@@ -27,7 +27,6 @@ type (
 	}
 )
 
-
 func NewMySQLStorage(ctx context.Context, db *sql.DB, tableName string, generator IdGenerator) currency_fetcher.Storage {
 	return mysqlStorage{
 		idGenerator: generator,
@@ -114,6 +113,23 @@ func (m mysqlStorage) GetByDate(from, to string, start, end time.Time, page, per
 
 func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
 	panic("implement me")
+}
+
+func (m mysqlStorage) Migrate() error {
+	_, err := m.db.ExecContext(m.ctx, `CREATE TABLE currency_store_test(
+		id binary(36) PRIMARY KEY,
+		currency varchar(20) NOT NULL,
+		provider varchar(30) NOT NULL,
+		rate float(8,4) NOT NULL,
+		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
+	);`)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = m.db.ExecContext(m.ctx, `CREATE INDEX search_index ON currency_store_test(currency, provider, created_at);`)
+	return err
 }
 
 func (mysqlStorage) GetStorageProviderName() string {

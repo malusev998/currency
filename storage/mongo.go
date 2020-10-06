@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 	"strings"
 	"time"
 )
@@ -107,6 +108,47 @@ func (m mongoStorage) Store(currency []currency_fetcher.Currency) ([]currency_fe
 	}
 
 	return data, nil
+}
+
+func (m mongoStorage) Migrate() error {
+	_, err := m.collection.Indexes().CreateOne(m.ctx, mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{
+				Key:   "currency",
+				Value: bsonx.Int32(1),
+			},
+			{
+				Key:   "createdAt",
+				Value: bsonx.Int32(-1),
+			},
+		},
+		Options: nil,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	_, err = m.collection.Indexes().CreateOne(m.ctx, mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{
+				Key:   "currency",
+				Value: bsonx.Int32(1),
+			},
+			{
+				Key:   "provider",
+				Value: bsonx.Int32(1),
+			},
+			{
+				Key:   "createdAt",
+				Value: bsonx.Int32(-1),
+			},
+		},
+		Options: nil,
+	})
+
+	return err
+
 }
 
 func (mongoStorage) GetStorageProviderName() string {

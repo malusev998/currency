@@ -31,6 +31,8 @@ func main() {
 		log.Fatalf("Error while reading in the config file: %v", err)
 	}
 
+	migrate := viper.GetBool("migrate")
+
 	for _, st := range viper.GetStringSlice("storage") {
 		switch st {
 		case "mysql":
@@ -40,7 +42,15 @@ func main() {
 				log.Fatalf("Error while connecting to mysql: %v", err)
 			}
 
-			storages = append(storages, storage.NewMySQLStorage(ctx, sqlDb, config["table"], nil))
+			mysqlStorage := storage.NewMySQLStorage(ctx, sqlDb, config["table"], nil)
+
+			if migrate {
+				if err := mysqlStorage.Migrate(); err != nil {
+					log.Fatalf("Error while migrating mysql database: %v", err)
+				}
+			}
+
+			storages = append(storages, mysqlStorage)
 		case "mongodb":
 			config := viper.GetStringMapString("databases.mongodb")
 			mongoDbClient, err = mongo.NewClient(options.Client().ApplyURI(config["uri"]))
@@ -52,9 +62,21 @@ func main() {
 			if err := mongoDbClient.Connect(ctx); err != nil {
 				log.Fatalf("Error while connecting to mongodb: %v", err)
 			}
-
 			db := mongoDbClient.Database(config["database"])
-			storages = append(storages, storage.NewMongoStorage(ctx, db.Collection(config["collection"])))
+
+			mongoStorage := storage.NewMongoStorage(ctx, db.Collection(config["collection"]))
+
+			if migrate {
+				if err := db.CreateCollection(ctx, config["collection"]); err != nil {
+					log.Fatalf("Error while creating mongodb collection: %v", err)
+				}
+
+				if err := mongoStorage.Migrate(); err != nil {
+					log.Fatalf("Error while migrating mongodb collection: %v", err)
+				}
+			}
+
+			storages = append(storages, mongoStorage)
 		}
 	}
 
@@ -70,7 +92,6 @@ func main() {
 		log.Fatalf("Error while parsing maxPerRequest in fetchers.freecurrconv: %v", err)
 	}
 
-
 	service := services.FreeConvService{
 		Fetcher: currency.FreeCurrConvFetcher{
 			ApiKey:        fetcherConfig["apiKey"],
@@ -79,7 +100,6 @@ func main() {
 		},
 		Storage: storages,
 	}
-
 
 	_, err = service.Save(viper.GetStringSlice("currencies"))
 

@@ -9,4 +9,5 @@ type Storage interface {
 	GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]CurrencyWithId, error)
 	GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]CurrencyWithId, error)
 	GetStorageProviderName() string
+	Migrate() error
 }

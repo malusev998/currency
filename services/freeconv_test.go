@@ -60,6 +60,10 @@ func (m *MockStorage) GetStorageProviderName() string {
 	return "MockStorage"
 }
 
+func (m *MockStorage) Migrate() error {
+	return nil
+}
+
 func (m *MockFetcher) Fetch(currenciesToFetch []string) ([]currency_fetcher.Currency, error) {
 	args := m.Called(currenciesToFetch)
 	return1 := args.Get(0)
@@ -134,7 +138,7 @@ func TestFreeConvService(t *testing.T) {
 		asserts.Nil(savedCurrencies)
 		asserts.NotNil(err)
 	})
-	
+
 	t.Run("StorageReturnsError", func(t *testing.T) {
 		fetcher := &MockFetcher{}
 		storage := &MockStorage{}
