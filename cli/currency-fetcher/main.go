@@ -3,17 +3,17 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"github.com/BrosSquad/currency-fetcher"
+	"log"
+	"strconv"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 	"github.com/BrosSquad/currency-fetcher/currency"
 	"github.com/BrosSquad/currency-fetcher/services"
 	"github.com/BrosSquad/currency-fetcher/storage"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
-	"strconv"
 )
 
 type Config struct {
@@ -24,6 +24,15 @@ type Config struct {
 		MaxPerRequest      int
 	}
 	CurrenciesToFetch []string
+}
+
+func getMysqlDSN(config map[string]string) string {
+	mysqlDriverConfig := mysql.NewConfig()
+	mysqlDriverConfig.User = config["user"]
+	mysqlDriverConfig.Passwd = config["password"]
+	mysqlDriverConfig.Addr = config["addr"]
+	mysqlDriverConfig.DBName = config["db"]
+	return mysqlDriverConfig.FormatDSN()
 }
 
 func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mongoDbClient **mongo.Client) Config {
@@ -45,7 +54,8 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 		switch st {
 		case "mysql":
 			mysqlConfig := viperConfig.GetStringMapString("databases.mysql")
-			*sqlDb, err = sql.Open("mysql", fmt.Sprintf("%s:%s@%s:%s/%s", mysqlConfig["user"], mysqlConfig["password"], mysqlConfig["host"], mysqlConfig["port"], mysqlConfig["db"]))
+
+			*sqlDb, err = sql.Open("mysql", getMysqlDSN(mysqlConfig))
 			if err != nil {
 				log.Fatalf("Error while connecting to mysql: %v", err)
 			}
@@ -111,7 +121,6 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 func main() {
 	var mongoDbClient *mongo.Client
 	var sqlDb *sql.DB
-	var err error
 	storages := make([]currency_fetcher.Storage, 0, 2)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -126,11 +135,10 @@ func main() {
 		Storage: storages,
 	}
 
-	_, err = service.Save(config.CurrenciesToFetch)
-
-	if err != nil {
-		log.Fatalf("Error while saving currencies: %v", err)
-	}
+	execute(&commandConfig{
+		CurrenciesToFetch: config.CurrenciesToFetch,
+		CurrencyService:   service,
+	})
 
 	if mongoDbClient != nil && mongoDbClient.Disconnect(ctx) == nil {
 		log.Println("Disconnecting from mongodb")
