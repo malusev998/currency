@@ -3,13 +3,12 @@ storage:
   - mongodb
 fetchers:
   freecurrconv:
-    apiKey: 1234
+    apiKey: 4fe80535c82bfc9a5112
     maxPerHour: 100
     maxPerRequest: 2
 databases:
   mysql:
-    host: localhost
-    port: 3306
+    addr: 127.0.0.1:3306
     user: currency
     password: currency
     db: currencydb
