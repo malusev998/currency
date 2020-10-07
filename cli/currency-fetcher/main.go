@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"github.com/BrosSquad/currency-fetcher/cli/cmd"
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	"github.com/BrosSquad/currency-fetcher"
 	"github.com/BrosSquad/currency-fetcher/currency"
 	"github.com/BrosSquad/currency-fetcher/services"
 	"github.com/BrosSquad/currency-fetcher/storage"
@@ -70,7 +73,7 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 
 			config.Storages = append(config.Storages, mysqlStorage)
 		case "mongodb":
-			mongodbConfig := viperConfig.GetStringMapString("databases.mongodb")
+			mongodbConfig := viperConfig.GetStringMapString("databases.mongo")
 			*mongoDbClient, err = mongo.NewClient(options.Client().ApplyURI(mongodbConfig["uri"]))
 
 			if err != nil {
@@ -80,13 +83,15 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 			if err := (*mongoDbClient).Connect(ctx); err != nil {
 				log.Fatalf("Error while connecting to mongodb: %v", err)
 			}
-			db := (*mongoDbClient).Database(mongodbConfig["database"])
+			db := (*mongoDbClient).Database(mongodbConfig["db"])
 
 			mongoStorage := storage.NewMongoStorage(ctx, db.Collection(mongodbConfig["collection"]))
 
 			if migrate {
 				if err := db.CreateCollection(ctx, mongodbConfig["collection"]); err != nil {
-					log.Fatalf("Error while creating mongodb collection: %v", err)
+					if _, ok := err.(mongo.CommandError); !ok {
+						log.Fatalf("Error while creating mongodb collection: %v", err)
+					}
 				}
 
 				if err := mongoStorage.Migrate(); err != nil {
@@ -99,7 +104,7 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 	}
 
 	fetcherConfig := viperConfig.GetStringMapString("fetchers.freecurrconv")
-	maxPerHour, err := strconv.ParseUint(fetcherConfig["maxPerHour"], 10, 32)
+	maxPerHour, err := strconv.ParseUint(fetcherConfig["maxperhour"], 10, 32)
 
 	if err != nil {
 		log.Fatalf("Error while parsing maxPerHour in fetchers.freecurrconv: %v", err)
@@ -107,13 +112,13 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 
 	config.FreeConvServiceConfig.MaxPerHourRequests = int(maxPerHour)
 
-	maxPerRequest, err := strconv.ParseUint(fetcherConfig["maxPerRequest"], 10, 32)
+	maxPerRequest, err := strconv.ParseUint(fetcherConfig["maxperrequest"], 10, 32)
 	if err != nil {
 		log.Fatalf("Error while parsing maxPerRequest in fetchers.freecurrconv: %v", err)
 	}
 
 	config.FreeConvServiceConfig.MaxPerRequest = int(maxPerRequest)
-	config.FreeConvServiceConfig.ApiKey = fetcherConfig["apiKey"]
+	config.FreeConvServiceConfig.ApiKey = fetcherConfig["apikey"]
 	config.CurrenciesToFetch = viperConfig.GetStringSlice("currencies")
 	return config
 }
@@ -123,7 +128,7 @@ func main() {
 	var sqlDb *sql.DB
 	storages := make([]currency_fetcher.Storage, 0, 2)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	signalChannel := make(chan os.Signal, 1)
 	config := getConfig(ctx, viper.New(), &sqlDb, &mongoDbClient)
 
 	service := services.FreeConvService{
@@ -135,16 +140,34 @@ func main() {
 		Storage: storages,
 	}
 
-	execute(&commandConfig{
+	signal.Notify(signalChannel, os.Interrupt, os.Kill)
+
+	go func(signalChannel <-chan os.Signal, cancel context.CancelFunc) {
+		select {
+		case <-signalChannel:
+			cancel()
+		}
+	}(signalChannel, cancel)
+
+	err := cmd.Execute(&cmd.Config{
+		Ctx:               ctx,
 		CurrenciesToFetch: config.CurrenciesToFetch,
 		CurrencyService:   service,
 	})
 
-	if mongoDbClient != nil && mongoDbClient.Disconnect(ctx) == nil {
-		log.Println("Disconnecting from mongodb")
+	if err != nil {
+		log.Fatalf("Error while executing command: %v", err)
 	}
 
-	if sqlDb != nil && sqlDb.Close() == nil {
-		log.Println("Disconnecting from SQL Database")
+	if mongoDbClient != nil {
+		if err := mongoDbClient.Disconnect(ctx); err != nil {
+			log.Printf("Disconnecting from mongodb failed: %v", err)
+		}
+	}
+
+	if sqlDb != nil {
+		if err := sqlDb.Close(); err != nil {
+			log.Printf("Disconnecting from SQL Database failed: %v", err)
+		}
 	}
 }

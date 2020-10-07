@@ -73,10 +73,10 @@ func TestStoreInMongo(t *testing.T) {
 
 		currencies, err := storage.Store([]currency_fetcher.Currency{
 			{
-				From:     "EUR",
-				To:       "USD",
-				Provider: "TestProvider",
-				Rate:     0.8,
+				From:      "EUR",
+				To:        "USD",
+				Provider:  "TestProvider",
+				Rate:      0.8,
 				CreatedAt: time.Now().Add(time.Duration(10) * time.Minute),
 			},
 			{

@@ -116,7 +116,7 @@ func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end
 }
 
 func (m mysqlStorage) Migrate() error {
-	_, err := m.db.ExecContext(m.ctx, `CREATE TABLE currency_store_test(
+	_, err := m.db.ExecContext(m.ctx, `CREATE TABLE IF NOT EXISTS currency_store_test(
 		id binary(36) PRIMARY KEY,
 		currency varchar(20) NOT NULL,
 		provider varchar(30) NOT NULL,
@@ -128,7 +128,7 @@ func (m mysqlStorage) Migrate() error {
 		return err
 	}
 
-	_, err = m.db.ExecContext(m.ctx, `CREATE INDEX search_index ON currency_store_test(currency, provider, created_at);`)
+	_, err = m.db.ExecContext(m.ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
 	return err
 }
 

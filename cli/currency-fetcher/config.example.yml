@@ -1,0 +1,23 @@
+storage:
+  - mysql
+  - mongodb
+fetchers:
+  freecurrconv:
+    apiKey: 1234
+    maxPerHour: 100
+    maxPerRequest: 2
+databases:
+  mysql:
+    addr: 127.0.0.1:3306
+    user: currency
+    password: currency
+    db: currencydb
+    table: currency
+  mongo:
+    uri: mongodb://localhost:27017
+    db: currencydb
+    collection: currency
+migrate: true
+currencies:
+  - EUR_RSD
+  - RSD_EUR
