@@ -20,7 +20,5 @@ databases:
     collection: currency
 migrate: true
 currencies:
-  - EUR_USD
-  - USD_EUR
   - EUR_RSD
   - RSD_EUR

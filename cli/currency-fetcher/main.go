@@ -16,33 +16,41 @@ import (
 	"strconv"
 )
 
-func main() {
-	var mongoDbClient *mongo.Client
-	var sqlDb *sql.DB
+type Config struct {
+	Storages              []currency_fetcher.Storage
+	FreeConvServiceConfig struct {
+		ApiKey             string
+		MaxPerHourRequests int
+		MaxPerRequest      int
+	}
+	CurrenciesToFetch []string
+}
+
+func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mongoDbClient **mongo.Client) Config {
+	var config Config
 	var err error
-	storages := make([]currency_fetcher.Storage, 0, 2)
-	ctx := context.Background()
+	viperConfig.SetConfigName("config")
+	viperConfig.SetConfigType("yaml")
+	viperConfig.AddConfigPath(".")
 
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	config.Storages = make([]currency_fetcher.Storage, 0, 2)
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := viperConfig.ReadInConfig(); err != nil {
 		log.Fatalf("Error while reading in the config file: %v", err)
 	}
 
-	migrate := viper.GetBool("migrate")
+	migrate := viperConfig.GetBool("migrate")
 
-	for _, st := range viper.GetStringSlice("storage") {
+	for _, st := range viperConfig.GetStringSlice("storage") {
 		switch st {
 		case "mysql":
-			config := viper.GetStringMapString("databases.mysql")
-			sqlDb, err = sql.Open("mysql", fmt.Sprintf("%s:%s@%s:%s/%s", config["user"], config["password"], config["host"], config["port"], config["db"]))
+			mysqlConfig := viperConfig.GetStringMapString("databases.mysql")
+			*sqlDb, err = sql.Open("mysql", fmt.Sprintf("%s:%s@%s:%s/%s", mysqlConfig["user"], mysqlConfig["password"], mysqlConfig["host"], mysqlConfig["port"], mysqlConfig["db"]))
 			if err != nil {
 				log.Fatalf("Error while connecting to mysql: %v", err)
 			}
 
-			mysqlStorage := storage.NewMySQLStorage(ctx, sqlDb, config["table"], nil)
+			mysqlStorage := storage.NewMySQLStorage(ctx, *sqlDb, mysqlConfig["table"], nil)
 
 			if migrate {
 				if err := mysqlStorage.Migrate(); err != nil {
@@ -50,24 +58,24 @@ func main() {
 				}
 			}
 
-			storages = append(storages, mysqlStorage)
+			config.Storages = append(config.Storages, mysqlStorage)
 		case "mongodb":
-			config := viper.GetStringMapString("databases.mongodb")
-			mongoDbClient, err = mongo.NewClient(options.Client().ApplyURI(config["uri"]))
+			mongodbConfig := viperConfig.GetStringMapString("databases.mongodb")
+			*mongoDbClient, err = mongo.NewClient(options.Client().ApplyURI(mongodbConfig["uri"]))
 
 			if err != nil {
-				log.Fatalf("Error in mongo configuration: %v", err)
+				log.Fatalf("Error in mongo mongodbConfiguration: %v", err)
 			}
 
-			if err := mongoDbClient.Connect(ctx); err != nil {
+			if err := (*mongoDbClient).Connect(ctx); err != nil {
 				log.Fatalf("Error while connecting to mongodb: %v", err)
 			}
-			db := mongoDbClient.Database(config["database"])
+			db := (*mongoDbClient).Database(mongodbConfig["database"])
 
-			mongoStorage := storage.NewMongoStorage(ctx, db.Collection(config["collection"]))
+			mongoStorage := storage.NewMongoStorage(ctx, db.Collection(mongodbConfig["collection"]))
 
 			if migrate {
-				if err := db.CreateCollection(ctx, config["collection"]); err != nil {
+				if err := db.CreateCollection(ctx, mongodbConfig["collection"]); err != nil {
 					log.Fatalf("Error while creating mongodb collection: %v", err)
 				}
 
@@ -76,32 +84,49 @@ func main() {
 				}
 			}
 
-			storages = append(storages, mongoStorage)
+			config.Storages = append(config.Storages, mongoStorage)
 		}
 	}
 
-	fetcherConfig := viper.GetStringMapString("fetchers.freecurrconv")
+	fetcherConfig := viperConfig.GetStringMapString("fetchers.freecurrconv")
 	maxPerHour, err := strconv.ParseUint(fetcherConfig["maxPerHour"], 10, 32)
 
 	if err != nil {
 		log.Fatalf("Error while parsing maxPerHour in fetchers.freecurrconv: %v", err)
 	}
 
+	config.FreeConvServiceConfig.MaxPerHourRequests = int(maxPerHour)
+
 	maxPerRequest, err := strconv.ParseUint(fetcherConfig["maxPerRequest"], 10, 32)
 	if err != nil {
 		log.Fatalf("Error while parsing maxPerRequest in fetchers.freecurrconv: %v", err)
 	}
 
+	config.FreeConvServiceConfig.MaxPerRequest = int(maxPerRequest)
+	config.FreeConvServiceConfig.ApiKey = fetcherConfig["apiKey"]
+	config.CurrenciesToFetch = viperConfig.GetStringSlice("currencies")
+	return config
+}
+
+func main() {
+	var mongoDbClient *mongo.Client
+	var sqlDb *sql.DB
+	var err error
+	storages := make([]currency_fetcher.Storage, 0, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	config := getConfig(ctx, viper.New(), &sqlDb, &mongoDbClient)
+
 	service := services.FreeConvService{
 		Fetcher: currency.FreeCurrConvFetcher{
-			ApiKey:        fetcherConfig["apiKey"],
-			MaxPerHour:    int(maxPerHour),
-			MaxPerRequest: int(maxPerRequest),
+			ApiKey:        config.FreeConvServiceConfig.ApiKey,
+			MaxPerHour:    config.FreeConvServiceConfig.MaxPerHourRequests,
+			MaxPerRequest: config.FreeConvServiceConfig.MaxPerRequest,
 		},
 		Storage: storages,
 	}
 
-	_, err = service.Save(viper.GetStringSlice("currencies"))
+	_, err = service.Save(config.CurrenciesToFetch)
 
 	if err != nil {
 		log.Fatalf("Error while saving currencies: %v", err)
