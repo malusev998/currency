@@ -17,4 +17,4 @@ COPY --from=builder /build/currency-fetcher /bin/currency-fetcher
 ARG DEBUG=false
 ARG AFTER=1h0m0s
 
-ENTRYPOINT ["currency-fether", "fetch", "--debug=${DEBUG}", "--standalone=true", "--after=${AFTER}"]
+ENTRYPOINT ["currency-fether", "fetch", "--debug=${DEBUG}", "--config=/etc/currency-fetcher/config.yml", "--standalone=true", "--after=${AFTER}"]

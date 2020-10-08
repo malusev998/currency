@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/BrosSquad/currency-fetcher"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -13,6 +14,7 @@ var (
 		Version: "v1.0.0",
 	}
 	debug bool
+	configFile string
 )
 
 type (
@@ -25,12 +27,15 @@ type (
 )
 
 func Execute(config *Config) error {
-	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Debug flag")
 	config.debug = &debug
 	rootCmd.AddCommand(fetch(config))
 	return rootCmd.Execute()
 }
 
 func init() {
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Debug flag")
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "./config.yml", "Path to config file")
 	cobra.OnInitialize()
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	viper.SetConfigFile(configFile)
 }

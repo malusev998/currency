@@ -2,7 +2,7 @@ version: '3'
 tasks:
   build-test-image:
     cmds:
-      - docker build -t "currency_fetcher_test:1.0.0" --file Dockerfile-test .
+      - docker build -t "currency_fetcher_test:1.0.0" --file Dockerfile-fetching-test .
   test:
     cmds:
       - docker run --rm -it -e RUNNING_IN_DOCKER=1 -e GOPATH=/go -e GO11MODULE=on \
@@ -10,3 +10,8 @@ tasks:
         --network currency-fetcher_currency_fetcher \
         -v $(pwd):/go/src/github.com/BrosSquad/currency-fetcher golang:1.15.2 \
         go test -v ./...
+  fmt:
+    cmds:
+      - go fmt ./...
+  build-executable:
+    cmds:

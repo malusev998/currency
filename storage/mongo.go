@@ -48,6 +48,9 @@ func (m mongoStorage) GetByDateAndProvider(from, to, provider string, start, end
 	cursor, err := m.collection.Find(m.ctx, filter, &options.FindOptions{
 		Limit: &perPage,
 		Skip:  &skip,
+		Sort: bson.M{
+			"createdAt": -1,
+		},
 	})
 
 	if err != nil {
