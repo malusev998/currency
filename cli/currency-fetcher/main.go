@@ -38,25 +38,21 @@ func getMysqlDSN(config map[string]string) string {
 	return mysqlDriverConfig.FormatDSN()
 }
 
-func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mongoDbClient **mongo.Client) Config {
+func getConfig(ctx context.Context, sqlDb **sql.DB, mongoDbClient **mongo.Client) Config {
 	var config Config
 	var err error
-	viperConfig.SetConfigName("config")
-	viperConfig.SetConfigType("yaml")
-	viperConfig.AddConfigPath(".")
-
 	config.Storages = make([]currency_fetcher.Storage, 0, 2)
 
-	if err := viperConfig.ReadInConfig(); err != nil {
+	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error while reading in the config file: %v", err)
 	}
 
-	migrate := viperConfig.GetBool("migrate")
+	migrate := viper.GetBool("migrate")
 
-	for _, st := range viperConfig.GetStringSlice("storage") {
+	for _, st := range viper.GetStringSlice("storage") {
 		switch st {
 		case "mysql":
-			mysqlConfig := viperConfig.GetStringMapString("databases.mysql")
+			mysqlConfig := viper.GetStringMapString("databases.mysql")
 
 			*sqlDb, err = sql.Open("mysql", getMysqlDSN(mysqlConfig))
 			if err != nil {
@@ -73,7 +69,7 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 
 			config.Storages = append(config.Storages, mysqlStorage)
 		case "mongodb":
-			mongodbConfig := viperConfig.GetStringMapString("databases.mongo")
+			mongodbConfig := viper.GetStringMapString("databases.mongo")
 			*mongoDbClient, err = mongo.NewClient(options.Client().ApplyURI(mongodbConfig["uri"]))
 
 			if err != nil {
@@ -103,7 +99,7 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 		}
 	}
 
-	fetcherConfig := viperConfig.GetStringMapString("fetchers.freecurrconv")
+	fetcherConfig := viper.GetStringMapString("fetchers.freecurrconv")
 	maxPerHour, err := strconv.ParseUint(fetcherConfig["maxperhour"], 10, 32)
 
 	if err != nil {
@@ -119,25 +115,23 @@ func getConfig(ctx context.Context, viperConfig *viper.Viper, sqlDb **sql.DB, mo
 
 	config.FreeConvServiceConfig.MaxPerRequest = int(maxPerRequest)
 	config.FreeConvServiceConfig.ApiKey = fetcherConfig["apikey"]
-	config.CurrenciesToFetch = viperConfig.GetStringSlice("currencies")
+	config.CurrenciesToFetch = viper.GetStringSlice("currencies")
 	return config
 }
 
 func main() {
 	var mongoDbClient *mongo.Client
 	var sqlDb *sql.DB
-	storages := make([]currency_fetcher.Storage, 0, 2)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalChannel := make(chan os.Signal, 1)
-	config := getConfig(ctx, viper.New(), &sqlDb, &mongoDbClient)
-
+	config := getConfig(ctx, &sqlDb, &mongoDbClient)
 	service := services.FreeConvService{
 		Fetcher: currency.FreeCurrConvFetcher{
 			ApiKey:        config.FreeConvServiceConfig.ApiKey,
 			MaxPerHour:    config.FreeConvServiceConfig.MaxPerHourRequests,
 			MaxPerRequest: config.FreeConvServiceConfig.MaxPerRequest,
 		},
-		Storage: storages,
+		Storage: config.Storages,
 	}
 
 	signal.Notify(signalChannel, os.Interrupt, os.Kill)
