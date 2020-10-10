@@ -11,7 +11,10 @@ import (
 	"time"
 )
 
-const MySQLStorageProviderName = "mysql"
+const (
+	MySQLStorageProviderName = "mysql"
+	MySQLTimeFormat  = "2006-01-02 15:04:05"
+)
 
 var ErrNotEnoughBytesInGenerator = errors.New("id generator must return byte slice with 16 bytes in it")
 
@@ -100,19 +103,64 @@ func (m mysqlStorage) Store(currency []currency_fetcher.Currency) ([]currency_fe
 }
 
 func (m mysqlStorage) Get(from, to string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
-	panic("implement me")
+	return m.GetByProvider(from, to, "", page, perPage)
 }
 
 func (m mysqlStorage) GetByProvider(from, to, provider string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
-	panic("implement me")
+	return m.GetByDateAndProvider(from, to, provider, time.Time{}, time.Now(), page, perPage)
 }
 
 func (m mysqlStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
-	panic("implement me")
+	return m.GetByDateAndProvider(from, to, "", start, end, page, perPage)
 }
 
 func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
-	panic("implement me")
+	if start.After(end) {
+		return nil, errors.New("start time cannot be after end time")
+	}
+
+	var builder strings.Builder
+
+	builder.WriteString("SELECT id,currency,provider,rate,created_at FROM ")
+	builder.WriteString(m.tableName)
+	builder.WriteString(" WHERE currency = ? AND created_at BETWEEN ? AND ?")
+
+	if provider != "" {
+		builder.WriteString(" AND provider = ?")
+	}
+
+	builder.WriteString(" ORDER BY created_at LIMIT ?, ?")
+
+	stmt, err := m.db.PrepareContext(m.ctx, builder.String())
+
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := stmt.Query(fmt.Sprintf("%s_%s", from, to), start.Format(MySQLTimeFormat), end.Format(MySQLTimeFormat), perPage, (page-1)*perPage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	result := make([]currency_fetcher.CurrencyWithId, 0, perPage)
+	for rows.Next() {
+		var currency string
+		var createdAt string
+		currencyWithId := currency_fetcher.CurrencyWithId{}
+		if err := rows.Scan(&currencyWithId.Id, currency, &currencyWithId.Provider, &currencyWithId.Rate, &createdAt); err != nil {
+			return nil, err
+		}
+
+		currencyWithId.CreatedAt, _ = time.Parse(MySQLTimeFormat, createdAt)
+		isoCurrencies := strings.Split(currency, "_")
+		currencyWithId.From = isoCurrencies[0]
+		currencyWithId.To = isoCurrencies[1]
+		result = append(result, currencyWithId)
+	}
+
+	return result, nil
 }
 
 func (m mysqlStorage) Migrate() error {

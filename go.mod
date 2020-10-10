@@ -3,6 +3,7 @@ module github.com/BrosSquad/currency-fetcher
 go 1.15
 
 require (
+	github.com/bxcodec/faker/v3 v3.5.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/google/uuid v1.1.2
 	github.com/shopspring/decimal v1.2.0

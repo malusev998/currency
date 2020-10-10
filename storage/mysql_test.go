@@ -2,15 +2,19 @@ package storage
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/BrosSquad/currency-fetcher"
+	"github.com/bxcodec/faker/v3"
+	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"math/rand"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -42,30 +46,55 @@ func (i *IdGeneratorMock) Generate() []byte {
 	return bytes
 }
 
-func TestMysqlStorage_Store(t *testing.T) {
-	t.Parallel()
+func connectToMysql() (*sql.DB, error) {
 	runningInDocker := false
 
 	if os.Getenv("RUNNING_IN_DOCKER") != "" {
 		runningInDocker = true
 	}
 
-	ctx := context.Background()
-	asserts := require.New(t)
-	uri := "currency:currency@/currencydb"
+	mysqlDriverConfig := mysql.NewConfig()
+	mysqlDriverConfig.User = "currency"
+	mysqlDriverConfig.Passwd = "currency"
+	mysqlDriverConfig.DBName = "currencydb"
+	connectionString := mysqlDriverConfig.FormatDSN()
 
 	if runningInDocker {
-		uri = "currency:currency@mysql:3306/currencydb"
+		mysqlDriverConfig.Addr = "mysql:3306"
+	} else {
+		mysqlDriverConfig.Addr = "localhost:3306"
 	}
 
-	db, err := sql.Open("mysql", uri)
+	return sql.Open("mysql", connectionString)
+}
 
+func seedMysql(ctx context.Context, db *sql.DB) error {
+	var builder strings.Builder
+	builder.WriteString("INSERT INTO currency_get_test(id, currency, provider, rate, created_at) VALUES ")
+	for i := 0; i < 100; i++ {
+		builder.WriteString(fmt.Sprintf("('%s','%s_%s','%s',%f,'%s'),", faker.UUIDHyphenated(), faker.Currency(), faker.Currency(), "TestProvider", rand.Float32(), time.Now().Add(-time.Duration(i)*time.Minute).Format(MySQLTimeFormat)))
+	}
+	builder.WriteString("('" + faker.UUIDHyphenated() + "',")
+	builder.WriteString("'EUR_USD', 'TestProvider', 1.8,")
+	builder.WriteString("'" + time.Now().Format(MySQLTimeFormat) + "'")
+	builder.WriteString(");")
+
+	_, err := db.ExecContext(ctx, builder.String())
+
+	return err
+}
+
+func TestMysqlStorage_Get(t *testing.T) {
+	t.Parallel()
+	asserts := require.New(t)
+	ctx := context.Background()
+	db, err := connectToMysql()
 	asserts.NotNil(db)
 	asserts.Nil(err)
 
-	defer db.ExecContext(ctx, "DROP TABLE currency_store_test;")
+	defer db.ExecContext(ctx, "DROP TABLE currency_get_test;")
 
-	_, err = db.ExecContext(ctx, `CREATE TABLE currency_store_test(
+	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS currency_get_test(
 		id binary(36) PRIMARY KEY,
 		currency varchar(20) NOT NULL,
 		provider varchar(30) NOT NULL,
@@ -73,7 +102,33 @@ func TestMysqlStorage_Store(t *testing.T) {
 		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
 	);`)
 	asserts.Nil(err)
-	_, err = db.ExecContext(ctx, `CREATE INDEX search_index ON currency_store_test(currency, provider, created_at);`)
+	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
+	asserts.Nil(err)
+	asserts.Nil(seedMysql(ctx, db))
+
+}
+
+func TestMysqlStorage_Store(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	asserts := require.New(t)
+
+	db, err := connectToMysql()
+	asserts.NotNil(db)
+	asserts.Nil(err)
+
+	defer db.ExecContext(ctx, "DROP TABLE currency_store_test;")
+
+	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS currency_store_test(
+		id binary(36) PRIMARY KEY,
+		currency varchar(20) NOT NULL,
+		provider varchar(30) NOT NULL,
+		rate float(8,4) NOT NULL,
+		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
+	);`)
+	asserts.Nil(err)
+	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
 	asserts.Nil(err)
 
 	t.Run("InsertOne", func(t *testing.T) {
@@ -94,6 +149,7 @@ func TestMysqlStorage_Store(t *testing.T) {
 		asserts.Len(currencies, 1)
 		asserts.IsType(uuid.UUID{}, currencies[0].Id)
 	})
+
 	t.Run("InsertMany", func(t *testing.T) {
 		storage := NewMySQLStorage(ctx, db, "currency_store_test", nil)
 		currencies, err := storage.Store([]currency_fetcher.Currency{
