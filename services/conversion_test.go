@@ -1,11 +1,8 @@
 package services
 
 import (
-<<<<<<< HEAD
-=======
 	"context"
 	"errors"
->>>>>>> de131c445a3313e051a0e97625e7ee1bb4adb7f8
 	"github.com/BrosSquad/currency-fetcher"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,8 +14,6 @@ type mockStorage struct {
 	mock.Mock
 }
 
-<<<<<<< HEAD
-=======
 type mockTimeoutStorage struct {
 	mock.Mock
 }
@@ -52,7 +47,6 @@ func (m *mockTimeoutStorage) Migrate() error {
 	panic("implement me")
 }
 
->>>>>>> de131c445a3313e051a0e97625e7ee1bb4adb7f8
 func (m *mockStorage) Store(currencies []currency_fetcher.Currency) ([]currency_fetcher.CurrencyWithId, error) {
 	panic("implement me")
 }
@@ -83,32 +77,6 @@ func (m *mockStorage) Migrate() error {
 }
 
 func TestConversionService_Convert(t *testing.T) {
-<<<<<<< HEAD
-	asserts := require.New(t)
-	storage := &mockStorage{}
-	now := time.Now()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-
-	storage.On("GetByDateAndProvider", "EUR", "USD", "TestProvider", startOfDay, now, int64(1), int64(1)).
-		Return([]currency_fetcher.CurrencyWithId{
-			{
-				Currency: currency_fetcher.Currency{
-					From:      "EUR",
-					To:        "USD",
-					Provider:  "TestProvider",
-					Rate:      1.2564421,
-					CreatedAt: time.Time{},
-				},
-				Id: 1,
-			},
-		}, nil)
-
-	service := ConversionService{Storage: storage}
-
-	value, err := service.Convert("EUR", "USD", "TestProvider", 1.531454, now)
-	asserts.Nil(err)
-	asserts.Equal(float32(1.924183), value)
-=======
 	t.Parallel()
 	asserts := require.New(t)
 	now := time.Now()
@@ -161,5 +129,4 @@ func TestConversionService_Convert(t *testing.T) {
 		asserts.True(errors.Is(err, ErrTimeRanOut))
 		asserts.Equal(float32(0.0), value)
 	})
->>>>>>> de131c445a3313e051a0e97625e7ee1bb4adb7f8
 }

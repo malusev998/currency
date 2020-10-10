@@ -12,13 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-<<<<<<< HEAD
 	"math/rand"
 	"os"
 	"strings"
-=======
-	"os"
->>>>>>> de131c445a3313e051a0e97625e7ee1bb4adb7f8
 	"testing"
 	"time"
 )
@@ -114,27 +110,9 @@ func TestMysqlStorage_Get(t *testing.T) {
 
 func TestMysqlStorage_Store(t *testing.T) {
 	t.Parallel()
-<<<<<<< HEAD
 
 	ctx := context.Background()
 	asserts := require.New(t)
-=======
-	runningInDocker := false
-
-	if os.Getenv("RUNNING_IN_DOCKER") != "" {
-		runningInDocker = true
-	}
-
-	ctx := context.Background()
-	asserts := require.New(t)
-	uri := "currency:currency@/currencydb"
-
-	if runningInDocker {
-		uri = "currency:currency@mysql:3306/currencydb"
-	}
-
-	db, err := sql.Open("mysql", uri)
->>>>>>> de131c445a3313e051a0e97625e7ee1bb4adb7f8
 
 	db, err := connectToMysql()
 	asserts.NotNil(db)
