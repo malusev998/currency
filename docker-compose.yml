@@ -1,5 +1,16 @@
 version: '3.4'
 services:
+  standalone_fetcher:
+    build:
+      dockerfile: ./docker/Dockerfile-fetching
+      args:
+        DEBUG: 0
+        AFTER: 1h0m0s
+    networks:
+      - currency_fetcher
+    volumes:
+      - ./cli/currency-fetcher/config.yml:/etc/currency-fetcher/config.yml
+    restart: unless-stopped
   mongo:
     image: mongo:4.4.1-bionic
     ports:

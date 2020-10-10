@@ -3,7 +3,7 @@ storage:
   - mongodb
 fetchers:
   freecurrconv:
-    apiKey: 4fe80535c82bfc9a5112
+    apiKey: 1234
     maxPerHour: 100
     maxPerRequest: 2
 databases:

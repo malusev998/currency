@@ -106,7 +106,6 @@ func (f FreeCurrConvFetcher) fetchCurrencies(client *http.Client, wg *sync.WaitG
 
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
-
 	if res.StatusCode == http.StatusOK {
 		data := map[string]float32{}
 

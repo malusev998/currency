@@ -180,6 +180,23 @@ func (m mysqlStorage) Migrate() error {
 	return err
 }
 
+func (m mysqlStorage) Migrate() error {
+	_, err := m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s(
+		id binary(36) PRIMARY KEY,
+		currency varchar(20) NOT NULL,
+		provider varchar(30) NOT NULL,
+		rate float(8,4) NOT NULL,
+		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
+	);`, m.tableName))
+
+	if err != nil {
+		return err
+	}
+
+	_, err = m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE INDEX IF NOT EXISTS search_index ON %s(currency, provider, created_at);`, m.tableName))
+	return err
+}
+
 func (mysqlStorage) GetStorageProviderName() string {
 	return MySQLStorageProviderName
 }
