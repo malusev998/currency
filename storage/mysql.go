@@ -5,15 +5,17 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/google/uuid"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 const (
 	MySQLStorageProviderName = "mysql"
-	MySQLTimeFormat  = "2006-01-02 15:04:05"
+	MySQLTimeFormat          = "2006-01-02 15:04:05"
 )
 
 var ErrNotEnoughBytesInGenerator = errors.New("id generator must return byte slice with 16 bytes in it")
@@ -161,23 +163,6 @@ func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end
 	}
 
 	return result, nil
-}
-
-func (m mysqlStorage) Migrate() error {
-	_, err := m.db.ExecContext(m.ctx, `CREATE TABLE currency_store_test(
-		id binary(36) PRIMARY KEY,
-		currency varchar(20) NOT NULL,
-		provider varchar(30) NOT NULL,
-		rate float(8,4) NOT NULL,
-		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
-	);`)
-
-	if err != nil {
-		return err
-	}
-
-	_, err = m.db.ExecContext(m.ctx, `CREATE INDEX search_index ON currency_store_test(currency, provider, created_at);`)
-	return err
 }
 
 func (m mysqlStorage) Migrate() error {

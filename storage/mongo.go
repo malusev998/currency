@@ -3,13 +3,15 @@ package storage
 import (
 	"context"
 	"fmt"
-	"github.com/BrosSquad/currency-fetcher"
+	"strings"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
-	"strings"
-	"time"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 const MongoDBProviderName = "mongodb"

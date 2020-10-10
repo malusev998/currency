@@ -3,11 +3,12 @@ package currency
 import (
 	"encoding/json"
 	"errors"
-	"github.com/BrosSquad/currency-fetcher"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 const (

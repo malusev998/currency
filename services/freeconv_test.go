@@ -2,13 +2,15 @@ package services
 
 import (
 	"errors"
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/BrosSquad/currency-fetcher"
 )
 
 type (

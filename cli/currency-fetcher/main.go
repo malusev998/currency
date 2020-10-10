@@ -3,20 +3,21 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/BrosSquad/currency-fetcher/cli/cmd"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/BrosSquad/currency-fetcher/currency"
-	"github.com/BrosSquad/currency-fetcher/services"
-	"github.com/BrosSquad/currency-fetcher/storage"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	"github.com/BrosSquad/currency-fetcher/cli/cmd"
+	"github.com/BrosSquad/currency-fetcher/currency"
+	"github.com/BrosSquad/currency-fetcher/services"
+	"github.com/BrosSquad/currency-fetcher/storage"
 )
 
 type Config struct {

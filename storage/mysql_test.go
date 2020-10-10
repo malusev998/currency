@@ -5,18 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/bxcodec/faker/v3"
-	"github.com/go-sql-driver/mysql"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bxcodec/faker/v3"
+	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 type (

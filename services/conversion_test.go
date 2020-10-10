@@ -3,11 +3,13 @@ package services
 import (
 	"context"
 	"errors"
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 type mockStorage struct {
@@ -119,7 +121,7 @@ func TestConversionService_Convert(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
 		go func() {
 			select {
-			case <-time.After(time.Duration(5)*time.Millisecond):
+			case <-time.After(time.Duration(5) * time.Millisecond):
 				cancel()
 			}
 		}()

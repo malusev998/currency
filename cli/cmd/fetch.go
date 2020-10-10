@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"log"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func fetch(config *Config) *cobra.Command {
@@ -40,8 +41,8 @@ func fetch(config *Config) *cobra.Command {
 						if err := handle(); err != nil {
 							log.Printf("ERROR: %v", err)
 						}
-						case <-config.Ctx.Done():
-							return
+					case <-config.Ctx.Done():
+						return
 					}
 				}
 			}
@@ -51,7 +52,6 @@ func fetch(config *Config) *cobra.Command {
 			}
 		},
 	}
-
 
 	fetchCmd.Flags().BoolVar(&standalone, "standalone", false, "Start up a long running fetching service")
 	fetchCmd.Flags().DurationVar(&after, "after", time.Duration(1)*time.Hour, "Fetching for standalone process")

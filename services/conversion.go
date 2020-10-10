@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"errors"
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/shopspring/decimal"
 	"math"
 	"time"
+
+	"github.com/shopspring/decimal"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 var (

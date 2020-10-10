@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"context"
-	"github.com/BrosSquad/currency-fetcher"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 var (
@@ -13,7 +15,7 @@ var (
 		Short:   "ISO Currency rate fetcher",
 		Version: "v1.0.0",
 	}
-	debug bool
+	debug      bool
 	configFile string
 )
 

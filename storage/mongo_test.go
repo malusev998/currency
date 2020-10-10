@@ -2,15 +2,17 @@ package storage
 
 import (
 	"context"
-	"github.com/BrosSquad/currency-fetcher"
-	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 func TestStoreInMongo(t *testing.T) {

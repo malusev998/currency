@@ -4,8 +4,9 @@ import (
 	"log"
 	"time"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 	"github.com/spf13/cobra"
+
+	currency_fetcher "github.com/BrosSquad/currency-fetcher"
 )
 
 var (
