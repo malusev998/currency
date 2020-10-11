@@ -6,8 +6,6 @@ tasks:
   build-standalone-image:
     cmds:
       - docker build -t "currency_fetcher_standalone:{{.GIT_COMMIT}}" --file Dockerfile-fetching .
-    vars:
-
   build-cli-image:
     cmds:
       - docker build -t "currency_fetcher_cli:{{.GIT_COMMIT}}" --file Dockerfile-cli .
