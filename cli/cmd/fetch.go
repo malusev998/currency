@@ -40,21 +40,23 @@ func fetch(config *Config) *cobra.Command {
 
 	fetchCmd.Run = func(logger, errLogger *log.Logger) func(cmd *cobra.Command, args []string) {
 		return func(cmd *cobra.Command, args []string) {
-			if standalone {
-				for {
-					select {
-					case <-time.After(after):
-						if err := handle(logger); err != nil {
-							errLogger.Printf("ERROR: %v", err)
-						}
-					case <-config.Ctx.Done():
-						return
-					}
-				}
-			}
-
 			if err := handle(logger); err != nil {
 				errLogger.Printf("ERROR: %v", err)
+			}
+
+			if !standalone {
+				return
+			}
+
+			for {
+				select {
+				case <-time.After(after):
+					if err := handle(logger); err != nil {
+						errLogger.Printf("ERROR: %v", err)
+					}
+				case <-config.Ctx.Done():
+					return
+				}
 			}
 		}
 	}(logger, errLogger)
