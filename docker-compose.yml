@@ -1,16 +1,5 @@
 version: '3.4'
 services:
-  # standalone_fetcher:
-  #   build:
-  #     dockerfile: ./docker/Dockerfile-fetching
-  #     args:
-  #       DEBUG: 0
-  #       AFTER: 1h0m0s
-  #   networks:
-  #     - currency_fetcher
-  #   volumes:
-  #     - ./cli/currency-fetcher/config.yml:/etc/currency-fetcher/config.yml
-  #   restart: unless-stopped
   mongo:
     image: mongo:4.4.1-bionic
     ports:
@@ -35,6 +24,24 @@ services:
       MYSQL_DATABASE: currencydb
       MYSQL_ROOT_HOST: '%'
     restart: unless-stopped
+  standalone_fetcher:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-fetching
+    networks:
+      - currency_fetcher
+    restart: unless-stopped
+    volumes:
+      - ./cli/currency-fetcher/config.yml:/currency-fetcher/config.yml
+    depends_on:
+      - mongo
+      - mysql
+    links:
+      - mongo
+      - mysql
+    environment:
+      DEBUG: 0
+      AFTER: 1h0m0s
 networks:
   currency_fetcher:
     driver: bridge
@@ -42,4 +49,6 @@ volumes:
   mongo_currency_fetcher:
     driver: local
   mysql_currency_fetcher:
+    driver: local
+  go_cache:
     driver: local

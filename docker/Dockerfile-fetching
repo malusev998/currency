@@ -1,20 +1,25 @@
+# syntax = docker/dockerfile:1-experimental
+
 FROM golang:1.15 as builder
 
 ENV GOPATH /go
 ENV GO11MODULES on
-ENV CGOENABLED 0
+ENV CGO_ENABLED=0
 
-COPY . /go/src/github.com/BrosSquad/currency-fetcher
-WORKDIR /go/src/github.com/BrosSquad/currency-fetcher/
+COPY . /go/src/github.com/malusev998/currency-fetcher
+WORKDIR /go/src/github.com/malusev998/currency-fetcher/
 
-RUN go test -v ./...
 RUN go build -v -o /build/currency-fetcher ./cli/currency-fetcher
 
 FROM alpine:latest
 
-COPY --from=builder /build/currency-fetcher /bin/currency-fetcher
+COPY --from=builder /build/currency-fetcher /currency-fetcher/app
+COPY ./entrypoint.sh /currency-fetcher/entrypoint.sh
+ENV DEBUG=false
+ENV AFTER=1h0m0s
 
-ARG DEBUG=false
-ARG AFTER=1h0m0s
+WORKDIR /currency-fetcher
+RUN chmod +x  /currency-fetcher/app
+RUN chmod +x  /currency-fetcher/entrypoint.sh
 
-ENTRYPOINT ["currency-fether", "fetch", "--debug=${DEBUG}", "--config=/etc/currency-fetcher/config.yml", "--standalone=true", "--after=${AFTER}"]
+ENTRYPOINT ["./entrypoint.sh"]

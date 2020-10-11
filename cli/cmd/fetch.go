@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,9 +12,6 @@ func fetch(config *Config) *cobra.Command {
 	var after time.Duration
 
 	handle := func(logger *log.Logger) error {
-
-		log.SetOutput(os.Stdout)
-		defer log.SetOutput(os.Stderr)
 		currenciesMap, err := config.CurrencyService.Save(config.CurrenciesToFetch)
 
 		if err != nil {

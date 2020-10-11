@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 )
 
 type (
@@ -58,13 +58,14 @@ func connectToMysql() (*sql.DB, error) {
 	mysqlDriverConfig.User = "currency"
 	mysqlDriverConfig.Passwd = "currency"
 	mysqlDriverConfig.DBName = "currencydb"
-	connectionString := mysqlDriverConfig.FormatDSN()
+	mysqlDriverConfig.Net = "tcp"
 
 	if runningInDocker {
 		mysqlDriverConfig.Addr = "mysql:3306"
 	} else {
 		mysqlDriverConfig.Addr = "localhost:3306"
 	}
+	connectionString := mysqlDriverConfig.FormatDSN()
 
 	return sql.Open("mysql", connectionString)
 }

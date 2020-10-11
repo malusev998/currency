@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 )
 
 var (
@@ -38,6 +39,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Debug flag")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "./config.yml", "Path to config file")
 	cobra.OnInitialize()
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	viper.SetConfigFile(configFile)
+	absolutePath, _ := filepath.Abs(configFile)
+	viper.SetConfigFile(absolutePath)
 }

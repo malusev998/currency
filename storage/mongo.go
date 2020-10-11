@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 )
 
 const MongoDBProviderName = "mongodb"

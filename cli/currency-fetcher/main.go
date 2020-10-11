@@ -13,11 +13,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
-	"github.com/BrosSquad/currency-fetcher/cli/cmd"
-	"github.com/BrosSquad/currency-fetcher/currency"
-	"github.com/BrosSquad/currency-fetcher/services"
-	"github.com/BrosSquad/currency-fetcher/storage"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
+	"github.com/malusev998/currency-fetcher/cli/cmd"
+	"github.com/malusev998/currency-fetcher/currency"
+	"github.com/malusev998/currency-fetcher/services"
+	"github.com/malusev998/currency-fetcher/storage"
 )
 
 type Config struct {
@@ -35,7 +35,10 @@ func getMysqlDSN(config map[string]string) string {
 	mysqlDriverConfig.User = config["user"]
 	mysqlDriverConfig.Passwd = config["password"]
 	mysqlDriverConfig.Addr = config["addr"]
+	mysqlDriverConfig.Net = "tcp"
+	log.Println(config["addr"])
 	mysqlDriverConfig.DBName = config["db"]
+	log.Println(mysqlDriverConfig.FormatDSN())
 	return mysqlDriverConfig.FormatDSN()
 }
 

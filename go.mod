@@ -1,4 +1,4 @@
-module github.com/BrosSquad/currency-fetcher
+module github.com/malusev998/currency-fetcher
 
 go 1.15
 

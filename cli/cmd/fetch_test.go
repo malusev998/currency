@@ -13,10 +13,10 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
-	"github.com/BrosSquad/currency-fetcher/currency"
-	"github.com/BrosSquad/currency-fetcher/services"
-	"github.com/BrosSquad/currency-fetcher/storage"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
+	"github.com/malusev998/currency-fetcher/currency"
+	"github.com/malusev998/currency-fetcher/services"
+	"github.com/malusev998/currency-fetcher/storage"
 )
 
 const mysqlTableName = "currency_integration_test"
@@ -54,13 +54,15 @@ func storages(t *testing.T, ctx context.Context) ([]currency_fetcher.Storage, *s
 	mysqlDriverConfig.User = "currency"
 	mysqlDriverConfig.Passwd = "currency"
 	mysqlDriverConfig.DBName = "currencydb"
-	connectionString := mysqlDriverConfig.FormatDSN()
 
+	mysqlDriverConfig.Net = "tcp"
 	if runningInDocker {
 		mysqlDriverConfig.Addr = "mysql:3306"
 	} else {
 		mysqlDriverConfig.Addr = "localhost:3306"
 	}
+
+	connectionString := mysqlDriverConfig.FormatDSN()
 
 	db, err := sql.Open("mysql", connectionString)
 

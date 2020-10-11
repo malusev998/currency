@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 )
 
 var (

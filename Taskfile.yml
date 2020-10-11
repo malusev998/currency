@@ -1,17 +1,19 @@
 version: '3'
 tasks:
-  build-test-image:
+  build-standalone-image:
     cmds:
-      - docker build -t "currency_fetcher_test:1.0.0" --file Dockerfile-fetching-test .
+      - docker build -t "currency_fetcher_standalone:1.0.0" --file Dockerfile-fetching .
+  build-cli-image:
+    cmds:
+      - docker build -t "currency_fetcher_cli:1.0.0" --file Dockerfile-cli .
   test:
     cmds:
-      - docker run --rm -it -e RUNNING_IN_DOCKER=1 -e GOPATH=/go -e GO11MODULE=on \
-        -w /go/src/github.com/BrosSquad/currency-fetcher \
-        --network currency-fetcher_currency_fetcher \
-        -v $(pwd):/go/src/github.com/BrosSquad/currency-fetcher golang:1.15.2 \
-        go test -v ./...
+      - docker run --rm -it -e RUNNING_IN_DOCKER=1 -e GOPATH=/go -e GO11MODULE=on
+        -w /go/src/github.com/malusev998/currency-fetcher --network currency-fetcher_currency_fetcher
+        -v "$(pwd):/go/src/github.com/malusev998/currency-fetcher" -v "go_cache:/go" golang:1.15 go test -v ./...
   fmt:
     cmds:
       - go fmt ./...
   build-executable:
     cmds:
+      - go build -v -o ./dist/cli ./cli/currency-fetcher

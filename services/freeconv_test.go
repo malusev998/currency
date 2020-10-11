@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/BrosSquad/currency-fetcher"
 )
 
 type (

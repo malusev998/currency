@@ -3,7 +3,7 @@ package services
 import (
 	"sync"
 
-	currency_fetcher "github.com/BrosSquad/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 )
 
 type FreeConvService struct {
