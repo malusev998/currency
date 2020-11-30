@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
-	"github.com/malusev998/currency-fetcher/fetchers"
-	service "github.com/malusev998/currency-fetcher/services"
-	"github.com/malusev998/currency-fetcher/storage"
+	currencyFetcher "github.com/malusev998/currency"
+	"github.com/malusev998/currency/fetchers"
+	service "github.com/malusev998/currency/services"
+	"github.com/malusev998/currency/storage"
 )
 
 func createStorages(config *Config) ([]currencyFetcher.Storage, error) {

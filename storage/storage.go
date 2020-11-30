@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency"
 )
 
 type (

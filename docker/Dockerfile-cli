@@ -4,8 +4,8 @@ ENV GOPATH /go
 ENV GO11MODULES on
 ENV CGO_ENABLED=0
 
-COPY . /go/src/github.com/malusev998/currency-fetcher
-WORKDIR /go/src/github.com/malusev998/currency-fetcher/
+COPY . /go/src/github.com/malusev998/currency
+WORKDIR /go/src/github.com/malusev998/currency/
 
 RUN go build -v -o /build/currency-fetcher ./cli/currency-fetcher
 

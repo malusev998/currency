@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency"
 )
 
 func TestStoreInMongo(t *testing.T) {

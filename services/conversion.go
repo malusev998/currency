@@ -8,7 +8,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency"
 )
 
 var (

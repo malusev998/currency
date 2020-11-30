@@ -2,7 +2,7 @@ package fetchers_test
 
 import (
 	"context"
-	"github.com/malusev998/currency-fetcher/fetchers"
+	"github.com/malusev998/currency/fetchers"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

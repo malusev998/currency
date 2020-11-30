@@ -3,7 +3,7 @@ package fetchers
 import (
 	"context"
 	"encoding/json"
-	currencyFetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency"
 	"io/ioutil"
 	"net/http"
 	"strings"

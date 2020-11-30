@@ -2,21 +2,17 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"github.com/malusev998/currency"
+	"github.com/malusev998/currency/storage"
 	"github.com/spf13/viper"
-	"strconv"
-
-	currencyFetcher "github.com/malusev998/currency-fetcher"
-	"github.com/malusev998/currency-fetcher/fetchers"
-	"github.com/malusev998/currency-fetcher/storage"
 )
 
 type (
-	FetchersConfig map[currencyFetcher.Provider]interface{}
+	FetchersConfig map[currency.Provider]interface{}
 	StorageConfig  map[storage.Provider]interface{}
 	Config         struct {
-		Fetchers          []currencyFetcher.Provider
+		Fetchers          []currency.Provider
 		Storage           []storage.Provider
 		FetchersConfig    FetchersConfig
 		StorageConfig     StorageConfig
@@ -39,19 +35,19 @@ func getConfig(ctx context.Context) (*Config, error) {
 	mysqlConfig := viper.GetStringMapString("databases.mysql")
 	mongodbConfig := viper.GetStringMapString("databases.mongo")
 
-	fetcherConfig := viper.GetStringMapString("fetchers.freecurrconv")
-	maxPerHour, err := strconv.ParseUint(fetcherConfig["maxperhour"], 10, 32)
+	//fetcherConfig := viper.GetStringMapString("fetchers.freecurrconv")
+	//maxPerHour, err := strconv.ParseUint(fetcherConfig["maxperhour"], 10, 32)
 
-	if err != nil {
-		return nil, fmt.Errorf("error while parsing maxPerHour in fetchers.freecurrconv: %v", err)
-	}
+	//if err != nil {
+	//	return nil, fmt.Errorf("error while parsing maxPerHour in fetchers.freecurrconv: %v", err)
+	//}
+	//
+	//maxPerRequest, err := strconv.ParseUint(fetcherConfig["maxperrequest"], 10, 32)
+	//if err != nil {
+	//	return nil, fmt.Errorf("error while parsing maxPerRequest in fetchers.freecurrconv: %v", err)
+	//}
 
-	maxPerRequest, err := strconv.ParseUint(fetcherConfig["maxperrequest"], 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("error while parsing maxPerRequest in fetchers.freecurrconv: %v", err)
-	}
-
-	fetchers, err := currencyFetcher.ConvertToProvidersFromStringSlice(viper.GetStringSlice("fetchers.fetch"))
+	fetchers, err := currency.ConvertToProvidersFromStringSlice(viper.GetStringSlice("fetchers.fetch"))
 
 	if err != nil {
 		return nil, err
@@ -81,22 +77,22 @@ func getConfig(ctx context.Context) (*Config, error) {
 				Collection:       mongodbConfig["collection"],
 			},
 		},
-		FetchersConfig: map[currencyFetcher.Provider]interface{}{
-			currencyFetcher.ExchangeRatesAPIProvider: fetchers.ExchangeRatesAPIConfig{
-				BaseConfig: fetchers.BaseConfig{
-					Ctx: ctx,
-					URL: viper.GetString("fetchers.exchangeratesapi"),
-				},
-			},
-			currencyFetcher.FreeConvProvider: fetchers.FreeConvServiceConfig{
-				BaseConfig: fetchers.BaseConfig{
-					Ctx: ctx,
-					URL: fetcherConfig["url"],
-				},
-				APIKey:             fetcherConfig["apikey"],
-				MaxPerHourRequests: int(maxPerHour),
-				MaxPerRequest:      int(maxPerRequest),
-			},
+		FetchersConfig: map[currency.Provider]interface{}{
+			//currency.ExchangeRatesAPIProvider: fetchers.ExchangeRatesAPIConfig{
+			//	BaseConfig: fetchers.BaseConfig{
+			//		Ctx: ctx,
+			//		URL: viper.GetString("fetchers.exchangeratesapi"),
+			//	},
+			//},
+			//currency.FreeConvProvider: fetchers.FreeConvServiceConfig{
+			//	BaseConfig: fetchers.BaseConfig{
+			//		Ctx: ctx,
+			//		URL: fetcherConfig["url"],
+			//	},
+			//	APIKey:             fetcherConfig["apikey"],
+			//	MaxPerHourRequests: int(maxPerHour),
+			//	MaxPerRequest:      int(maxPerRequest),
+			//},
 		},
 		CurrenciesToFetch: viper.GetStringSlice("currencies"),
 	}, nil

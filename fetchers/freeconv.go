@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency"
 )
 
 type FreeCurrConvFetcher struct {

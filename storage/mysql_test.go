@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency"
 )
 
 type (

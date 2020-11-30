@@ -3,7 +3,7 @@ package services
 import (
 	"sync"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency"
 )
 
 type Service struct {

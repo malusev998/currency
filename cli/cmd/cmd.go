@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency"
 	"path/filepath"
 
 	"github.com/spf13/cobra"

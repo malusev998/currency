@@ -13,10 +13,10 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
-	currencyFetcher "github.com/malusev998/currency-fetcher"
-	"github.com/malusev998/currency-fetcher/fetchers"
-	"github.com/malusev998/currency-fetcher/services"
-	"github.com/malusev998/currency-fetcher/storage"
+	currencyFetcher "github.com/malusev998/currency"
+	"github.com/malusev998/currency/fetchers"
+	"github.com/malusev998/currency/services"
+	"github.com/malusev998/currency/storage"
 )
 
 const mysqlTableName = "currency_integration_test"

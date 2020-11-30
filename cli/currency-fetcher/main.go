@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/malusev998/currency-fetcher/cli/cmd"
+	"github.com/malusev998/currency/cli/cmd"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currency_fetcher "github.com/malusev998/currency"
 	"net/http"
 	"net/http/httptest"
 	"strings"
