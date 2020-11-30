@@ -11,29 +11,30 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 )
 
 const MongoDBProviderName = "mongodb"
 
 type mongoStorage struct {
+	client     *mongo.Client
 	ctx        context.Context
 	collection *mongo.Collection
 }
 
-func (m mongoStorage) Get(from, to string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
-	return m.GetByProvider(from, to, "", page, perPage)
+func (m mongoStorage) Get(from, to string, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
+	return m.GetByProvider(from, to, currencyFetcher.EmptyProvider, page, perPage)
 }
 
-func (m mongoStorage) GetByProvider(from, to, provider string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mongoStorage) GetByProvider(from, to string, provider currencyFetcher.Provider, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	return m.GetByDateAndProvider(from, to, provider, time.Time{}, time.Now(), page, perPage)
 }
 
-func (m mongoStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mongoStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	return m.GetByDateAndProvider(from, to, "", start, end, page, perPage)
 }
 
-func (m mongoStorage) GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mongoStorage) GetByDateAndProvider(from, to string, provider currencyFetcher.Provider, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	filter := bson.M{
 		"currency": fmt.Sprintf("%s_%s", from, to),
 		"createdAt": bson.M{
@@ -42,7 +43,7 @@ func (m mongoStorage) GetByDateAndProvider(from, to, provider string, start, end
 		},
 	}
 
-	if provider != "" {
+	if provider != currencyFetcher.EmptyProvider {
 		filter["provider"] = provider
 	}
 
@@ -61,27 +62,27 @@ func (m mongoStorage) GetByDateAndProvider(from, to, provider string, start, end
 
 	defer cursor.Close(m.ctx)
 
-	currencies := make([]currency_fetcher.CurrencyWithId, 0, perPage)
+	currencies := make([]currencyFetcher.CurrencyWithID, 0, perPage)
 
 	for cursor.Next(m.ctx) {
 		current := cursor.Current
 		isoCurrencies := strings.Split(current.Lookup("currency").StringValue(), "_")
-		currencies = append(currencies, currency_fetcher.CurrencyWithId{
-			Currency: currency_fetcher.Currency{
+		currencies = append(currencies, currencyFetcher.CurrencyWithID{
+			Currency: currencyFetcher.Currency{
 				From:      isoCurrencies[0],
 				To:        isoCurrencies[1],
-				Provider:  current.Lookup("provider").StringValue(),
+				Provider:  currencyFetcher.Provider(current.Lookup("provider").StringValue()),
 				Rate:      float32(current.Lookup("rate").Double()),
 				CreatedAt: current.Lookup("createdAt").Time(),
 			},
-			Id: current.Lookup("_id").ObjectID(),
+			ID: current.Lookup("_id").ObjectID(),
 		})
 	}
 
 	return currencies, nil
 }
 
-func (m mongoStorage) Store(currency []currency_fetcher.Currency) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mongoStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetcher.CurrencyWithID, error) {
 	currenciesToInsert := make([]interface{}, 0, len(currency))
 
 	for _, cur := range currency {
@@ -104,11 +105,11 @@ func (m mongoStorage) Store(currency []currency_fetcher.Currency) ([]currency_fe
 		return nil, err
 	}
 
-	data := make([]currency_fetcher.CurrencyWithId, 0, len(results.InsertedIDs))
+	data := make([]currencyFetcher.CurrencyWithID, 0, len(results.InsertedIDs))
 	for i, result := range results.InsertedIDs {
-		data = append(data, currency_fetcher.CurrencyWithId{
+		data = append(data, currencyFetcher.CurrencyWithID{
 			Currency: currency[i],
-			Id:       result,
+			ID:       result,
 		})
 	}
 
@@ -153,16 +154,56 @@ func (m mongoStorage) Migrate() error {
 	})
 
 	return err
-
 }
 
 func (mongoStorage) GetStorageProviderName() string {
 	return MongoDBProviderName
 }
 
-func NewMongoStorage(ctx context.Context, collection *mongo.Collection) currency_fetcher.Storage {
-	return mongoStorage{
-		ctx:        ctx,
+func (m mongoStorage) Drop() error {
+	return m.collection.Drop(m.ctx)
+}
+
+func (m *mongoStorage) Close() error {
+	if err := m.client.Disconnect(m.ctx); err != nil {
+		return fmt.Errorf("disconnecting from mongodb failed: %v", err)
+	}
+	return nil
+}
+
+func NewMongoStorage(c MongoDBConfig) (currencyFetcher.Storage, error) {
+	mongoDbClient, err := mongo.NewClient(options.Client().ApplyURI(c.ConnectionString))
+
+	if err != nil {
+		return nil, fmt.Errorf("error while connecting to MongoDB database: %v", err)
+	}
+
+	if err := mongoDbClient.Connect(c.Cxt); err != nil {
+		return nil, fmt.Errorf("rrror while connecting to mongodb: %v", err)
+	}
+
+	db := (*mongoDbClient).Database(c.Database)
+	collection := db.Collection(c.Collection)
+
+	storage := &mongoStorage{
+		client:     mongoDbClient,
+		ctx:        c.Cxt,
 		collection: collection,
 	}
+
+	if c.Migrate {
+		if err := db.CreateCollection(c.Cxt, c.Collection); err != nil {
+			if _, ok := err.(mongo.CommandError); !ok {
+				return nil, fmt.Errorf("error while creating mongodb collection: %v", err)
+			}
+			return nil, err
+		}
+
+		if err := storage.Migrate(); err != nil {
+			return nil, fmt.Errorf("error while migrating mongodb collection: %v", err)
+		}
+	}
+
+	return storage, nil
+
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 	"github.com/malusev998/currency-fetcher/currency"
 	"github.com/malusev998/currency-fetcher/services"
 	"github.com/malusev998/currency-fetcher/storage"
@@ -26,7 +26,7 @@ type (
 	mysqlData struct {
 		ID        string
 		Currency  string
-		Provider  string
+		Provider  currencyFetcher.Provider
 		Rate      float32
 		CreatedAt string
 	}
@@ -42,8 +42,8 @@ func (h httpMock) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	writer.Write(payload)
 }
 
-func storages(t *testing.T, ctx context.Context) ([]currency_fetcher.Storage, *sql.DB) {
-	st := make([]currency_fetcher.Storage, 0)
+func storages(t *testing.T, ctx context.Context) ([]currencyFetcher.Storage, *sql.DB) {
+	st := make([]currencyFetcher.Storage, 0)
 	runningInDocker := false
 
 	if os.Getenv("RUNNING_IN_DOCKER") != "" {
@@ -57,7 +57,7 @@ func storages(t *testing.T, ctx context.Context) ([]currency_fetcher.Storage, *s
 
 	mysqlDriverConfig.Net = "tcp"
 	if runningInDocker {
-		mysqlDriverConfig.Addr = "mysql:3306"
+		mysqlDriverConfig.Addr = "sqlStorage:3306"
 	} else {
 		mysqlDriverConfig.Addr = "localhost:3306"
 	}
@@ -70,13 +70,21 @@ func storages(t *testing.T, ctx context.Context) ([]currency_fetcher.Storage, *s
 		t.FailNow()
 	}
 
-	mysql := storage.NewMySQLStorage(ctx, db, mysqlTableName, nil)
+	sqlStorage, _ := storage.NewMySQLStorage(storage.MySQLConfig{
+		BaseConfig: storage.BaseConfig{
+			Cxt:     ctx,
+			Migrate: true,
+		},
+		ConnectionString: connectionString,
+		TableName:        mysqlTableName,
+		IDGenerator:      nil,
+	})
 
-	if err := mysql.Migrate(); err != nil {
+	if err := sqlStorage.Migrate(); err != nil {
 		t.FailNow()
 	}
 
-	st = append(st, mysql)
+	st = append(st, sqlStorage)
 
 	return st, db
 }
@@ -94,7 +102,7 @@ func testMySQLDataSet(asserts *require.Assertions, rows *sql.Rows) {
 
 	for _, set := range mysqlDataSet {
 		asserts.Contains([]string{"EUR_USD", "USD_EUR"}, set.Currency)
-		asserts.Equal(currency.FreeConvProvider, set.Provider)
+		asserts.Equal(currencyFetcher.FreeConvProvider, set.Provider)
 		asserts.Contains([]float32{1.2, 0.8}, set.Rate)
 	}
 }
@@ -108,20 +116,25 @@ func TestFetchCommand(t *testing.T) {
 
 	defer server.Close()
 
-	fetcher := currency.FreeCurrConvFetcher{
-		ApiKey:        "123456",
-		MaxPerHour:    100,
-		MaxPerRequest: 2,
-		Url:           server.URL,
-	}
-
 	st, mysqlDb := storages(t, ctx)
 
-	defer mysqlDb.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", mysqlTableName))
+	for _, s := range st {
+		defer s.Drop()
+	}
 
-	currencyService := services.FreeConvService{
-		Fetcher: fetcher,
-		Storage: st,
+	currencyService := []currencyFetcher.Service{
+		services.Service{
+			Fetcher: currency.NewCurrencyFetcher(currencyFetcher.FreeConvProvider, currency.FreeConvServiceConfig{
+				BaseConfig: currency.BaseConfig{
+					Ctx: ctx,
+					URL: server.URL,
+				},
+				APIKey:             "123456",
+				MaxPerHourRequests: 100,
+				MaxPerRequest:      2,
+			}),
+			Storage: st,
+		},
 	}
 
 	config := Config{
@@ -143,5 +156,4 @@ func TestFetchCommand(t *testing.T) {
 
 		testMySQLDataSet(asserts, rows)
 	})
-
 }

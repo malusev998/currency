@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 )
 
 type (
@@ -22,7 +23,7 @@ type (
 	}
 )
 
-func (m *MockStorage) Store(currencies []currency_fetcher.Currency) ([]currency_fetcher.CurrencyWithId, error) {
+func (m *MockStorage) Store(currencies []currencyFetcher.Currency) ([]currencyFetcher.CurrencyWithID, error) {
 	args := m.Called(currencies)
 
 	return1 := args.Get(0)
@@ -30,31 +31,31 @@ func (m *MockStorage) Store(currencies []currency_fetcher.Currency) ([]currency_
 	if return1 == nil {
 		return nil, args.Error(1)
 	}
-	return return1.([]currency_fetcher.CurrencyWithId), args.Error(1)
+	return return1.([]currencyFetcher.CurrencyWithID), args.Error(1)
 }
 
-func (m *MockStorage) Get(from, to string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m *MockStorage) Get(from, to string, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	args := m.Called(from, to, page, perPage)
 
-	return args.Get(0).([]currency_fetcher.CurrencyWithId), args.Error(1)
+	return args.Get(0).([]currencyFetcher.CurrencyWithID), args.Error(1)
 }
 
-func (m *MockStorage) GetByProvider(from, to, provider string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m *MockStorage) GetByProvider(from, to string, provider currencyFetcher.Provider, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	args := m.Called(from, to, provider, page, perPage)
 
-	return args.Get(0).([]currency_fetcher.CurrencyWithId), args.Error(1)
+	return args.Get(0).([]currencyFetcher.CurrencyWithID), args.Error(1)
 }
 
-func (m *MockStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m *MockStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	args := m.Called(from, to, start, end, page, perPage)
 
-	return args.Get(0).([]currency_fetcher.CurrencyWithId), args.Error(1)
+	return args.Get(0).([]currencyFetcher.CurrencyWithID), args.Error(1)
 }
 
-func (m *MockStorage) GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m *MockStorage) GetByDateAndProvider(from, to string, provider currencyFetcher.Provider, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	args := m.Called(from, to, provider, start, end, page, perPage)
 
-	return args.Get(0).([]currency_fetcher.CurrencyWithId), args.Error(1)
+	return args.Get(0).([]currencyFetcher.CurrencyWithID), args.Error(1)
 }
 
 func (m *MockStorage) GetStorageProviderName() string {
@@ -65,7 +66,15 @@ func (m *MockStorage) Migrate() error {
 	return nil
 }
 
-func (m *MockFetcher) Fetch(currenciesToFetch []string) ([]currency_fetcher.Currency, error) {
+func (m *MockStorage) Close() error {
+	return nil
+}
+
+func (m *MockStorage) Drop() error {
+	return nil
+}
+
+func (m *MockFetcher) Fetch(currenciesToFetch []string) ([]currencyFetcher.Currency, error) {
 	args := m.Called(currenciesToFetch)
 	return1 := args.Get(0)
 
@@ -73,29 +82,29 @@ func (m *MockFetcher) Fetch(currenciesToFetch []string) ([]currency_fetcher.Curr
 		return nil, args.Error(1)
 	}
 
-	return return1.([]currency_fetcher.Currency), args.Error(1)
+	return return1.([]currencyFetcher.Currency), args.Error(1)
 }
 
 func TestFreeConvService(t *testing.T) {
 	t.Parallel()
 	asserts := require.New(t)
 	currenciesToFetch := []string{"EUR_USD", "USD_EUR"}
-	currenciesWithId := make([]currency_fetcher.CurrencyWithId, 0, len(currenciesToFetch))
-	currenciesFetched := make([]currency_fetcher.Currency, 0, len(currenciesToFetch))
+	currenciesWithId := make([]currencyFetcher.CurrencyWithID, 0, len(currenciesToFetch))
+	currenciesFetched := make([]currencyFetcher.Currency, 0, len(currenciesToFetch))
 	for i, c := range currenciesToFetch {
 		isoCurrencies := strings.Split(c, "_")
 		rate := rand.Float32()
-		currenciesWithId = append(currenciesWithId, currency_fetcher.CurrencyWithId{
-			Currency: currency_fetcher.Currency{
+		currenciesWithId = append(currenciesWithId, currencyFetcher.CurrencyWithID{
+			Currency: currencyFetcher.Currency{
 				From:      isoCurrencies[0],
 				To:        isoCurrencies[1],
 				Provider:  "MockProvider",
 				Rate:      rate,
 				CreatedAt: time.Now(),
 			},
-			Id: uint64(i),
+			ID: uint64(i),
 		})
-		currenciesFetched = append(currenciesFetched, currency_fetcher.Currency{
+		currenciesFetched = append(currenciesFetched, currencyFetcher.Currency{
 			From:     isoCurrencies[0],
 			To:       isoCurrencies[1],
 			Provider: "MockProvider",
@@ -106,9 +115,9 @@ func TestFreeConvService(t *testing.T) {
 	t.Run("SaveCorrectly", func(t *testing.T) {
 		fetcher := &MockFetcher{}
 		storage := &MockStorage{}
-		service := FreeConvService{
+		service := Service{
 			Fetcher: fetcher,
-			Storage: []currency_fetcher.Storage{storage},
+			Storage: []currencyFetcher.Storage{storage},
 		}
 
 		fetcher.On("Fetch", currenciesToFetch).Return(currenciesFetched, nil)
@@ -121,7 +130,7 @@ func TestFreeConvService(t *testing.T) {
 		asserts.Contains(savedCurrencies, "MockStorage")
 
 		for _, c := range savedCurrencies["MockStorage"] {
-			_, ok := c.Id.(uint64)
+			_, ok := c.ID.(uint64)
 			asserts.True(ok)
 		}
 	})
@@ -129,9 +138,9 @@ func TestFreeConvService(t *testing.T) {
 	t.Run("FetchReturnsError", func(t *testing.T) {
 		fetcher := &MockFetcher{}
 		storage := &MockStorage{}
-		service := FreeConvService{
+		service := Service{
 			Fetcher: fetcher,
-			Storage: []currency_fetcher.Storage{storage},
+			Storage: []currencyFetcher.Storage{storage},
 		}
 
 		fetcher.On("Fetch", currenciesToFetch).Return(nil, errors.New("an error has occurred"))
@@ -143,9 +152,9 @@ func TestFreeConvService(t *testing.T) {
 	t.Run("StorageReturnsError", func(t *testing.T) {
 		fetcher := &MockFetcher{}
 		storage := &MockStorage{}
-		service := FreeConvService{
+		service := Service{
 			Fetcher: fetcher,
-			Storage: []currency_fetcher.Storage{storage},
+			Storage: []currencyFetcher.Storage{storage},
 		}
 		fetcher.On("Fetch", currenciesToFetch).Return(currenciesFetched, nil)
 		storage.On("Store", currenciesFetched).Return(nil, errors.New("error while inserting into storage"))

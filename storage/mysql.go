@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 )
 
 const (
@@ -21,27 +21,18 @@ const (
 var ErrNotEnoughBytesInGenerator = errors.New("id generator must return byte slice with 16 bytes in it")
 
 type (
-	IdGenerator interface {
+	IDGenerator interface {
 		Generate() []byte
 	}
 	mysqlStorage struct {
-		idGenerator IdGenerator
+		idGenerator IDGenerator
 		ctx         context.Context
 		db          *sql.DB
 		tableName   string
 	}
 )
 
-func NewMySQLStorage(ctx context.Context, db *sql.DB, tableName string, generator IdGenerator) currency_fetcher.Storage {
-	return mysqlStorage{
-		idGenerator: generator,
-		ctx:         ctx,
-		db:          db,
-		tableName:   tableName,
-	}
-}
-
-func (m mysqlStorage) Store(currency []currency_fetcher.Currency) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mysqlStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetcher.CurrencyWithID, error) {
 	tx, err := m.db.Begin()
 
 	if err != nil {
@@ -50,7 +41,7 @@ func (m mysqlStorage) Store(currency []currency_fetcher.Currency) ([]currency_fe
 
 	var builder strings.Builder
 	bind := make([]interface{}, 0, 5*len(currency))
-	data := make([]currency_fetcher.CurrencyWithId, 0, len(currency))
+	data := make([]currencyFetcher.CurrencyWithID, 0, len(currency))
 	for _, cur := range currency {
 		var id uuid.UUID
 		if m.idGenerator == nil {
@@ -71,9 +62,9 @@ func (m mysqlStorage) Store(currency []currency_fetcher.Currency) ([]currency_fe
 		}
 		builder.WriteString("(?,?,?,?,?),")
 		bind = append(bind, id, fmt.Sprintf("%s_%s", cur.From, cur.To), cur.Provider, cur.Rate, createdAt)
-		data = append(data, currency_fetcher.CurrencyWithId{
+		data = append(data, currencyFetcher.CurrencyWithID{
 			Currency: cur,
-			Id:       id,
+			ID:       id,
 		})
 	}
 
@@ -104,19 +95,19 @@ func (m mysqlStorage) Store(currency []currency_fetcher.Currency) ([]currency_fe
 	return data, nil
 }
 
-func (m mysqlStorage) Get(from, to string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mysqlStorage) Get(from, to string, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	return m.GetByProvider(from, to, "", page, perPage)
 }
 
-func (m mysqlStorage) GetByProvider(from, to, provider string, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mysqlStorage) GetByProvider(from, to string, provider currencyFetcher.Provider, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	return m.GetByDateAndProvider(from, to, provider, time.Time{}, time.Now(), page, perPage)
 }
 
-func (m mysqlStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mysqlStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	return m.GetByDateAndProvider(from, to, "", start, end, page, perPage)
 }
 
-func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end time.Time, page, perPage int64) ([]currency_fetcher.CurrencyWithId, error) {
+func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFetcher.Provider, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	if start.After(end) {
 		return nil, errors.New("start time cannot be after end time")
 	}
@@ -146,12 +137,13 @@ func (m mysqlStorage) GetByDateAndProvider(from, to, provider string, start, end
 	}
 
 	defer rows.Close()
-	result := make([]currency_fetcher.CurrencyWithId, 0, perPage)
+
+	result := make([]currencyFetcher.CurrencyWithID, 0, perPage)
 	for rows.Next() {
 		var currency string
 		var createdAt string
-		currencyWithId := currency_fetcher.CurrencyWithId{}
-		if err := rows.Scan(&currencyWithId.Id, currency, &currencyWithId.Provider, &currencyWithId.Rate, &createdAt); err != nil {
+		currencyWithId := currencyFetcher.CurrencyWithID{}
+		if err := rows.Scan(&currencyWithId.ID, currency, &currencyWithId.Provider, &currencyWithId.Rate, &createdAt); err != nil {
 			return nil, err
 		}
 
@@ -184,4 +176,39 @@ func (m mysqlStorage) Migrate() error {
 
 func (mysqlStorage) GetStorageProviderName() string {
 	return MySQLStorageProviderName
+}
+
+func (m *mysqlStorage) Close() error {
+	if err := m.db.Close(); err != nil {
+		return fmt.Errorf("disconnecting from SQL Database failed: %v", err)
+	}
+	return nil
+}
+
+func (m mysqlStorage) Drop() error {
+	_, err := m.db.ExecContext(m.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", m.tableName))
+	return err
+}
+
+func NewMySQLStorage(c MySQLConfig) (currencyFetcher.Storage, error) {
+	db, err := sql.Open("mysql", c.ConnectionString)
+
+	if err != nil {
+		return nil, fmt.Errorf("Error while connecting to MySQL database: %v", err)
+	}
+
+	storage := &mysqlStorage{
+		idGenerator: c.IDGenerator,
+		ctx:         c.Cxt,
+		db:          db,
+		tableName:   c.TableName,
+	}
+
+	if c.Migrate {
+		if err := storage.Migrate(); err != nil {
+			return nil, fmt.Errorf("error while migrating mysql database: %v", err)
+		}
+	}
+
+	return storage, nil
 }

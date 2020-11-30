@@ -1,102 +1,58 @@
 package currency
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
-)
-
-const (
-	FreeConvFetchUrl = "https://free.currconv.com/api/v7/convert"
-	FreeConvProvider = "FreeCurrConversion"
-)
-
-var (
-	ErrUnAuthorized      = errors.New("unauthorized, API key is not provided")
-	ErrNotEnoughRequests = errors.New("not enough requests per hour")
-	ErrClient            = errors.New("client error")
-	ErrServer            = errors.New("server error")
-	ErrUnknown           = errors.New("unknown error")
-	ErrApiLimitReached   = errors.New("API limit reached")
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 )
 
 type FreeCurrConvFetcher struct {
-	Url           string
-	ApiKey        string
+	Ctx           context.Context
+	URL           string
+	APIKey        string
 	MaxPerHour    int
 	MaxPerRequest int
 }
 
-func (f FreeCurrConvFetcher) getData(url string, currencies []string) (*http.Request, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Accept", "application/json")
-	q := req.URL.Query()
-
-	var builder strings.Builder
-
-	for _, currency := range currencies {
-		builder.WriteString(currency)
-		builder.WriteRune(',')
-	}
-
-	q.Add("q", strings.TrimRight(builder.String(), ","))
-	q.Add("compact", "ultra")
-	q.Add("apiKey", f.ApiKey)
-
-	req.URL.RawQuery = q.Encode()
-
-	return req, nil
-}
-
-func appendToCurrencies(wg *sync.WaitGroup, c <-chan map[string]float32, currencies *[]currency_fetcher.Currency) {
+func (f FreeCurrConvFetcher) fetchCurrencies(
+	client *http.Client,
+	wg *sync.WaitGroup,
+	currencies []string,
+	channel currencyChannel,
+	errorChannel chan<- error,
+) {
 	defer wg.Done()
-	handle := func(data map[string]float32, currencies *[]currency_fetcher.Currency) {
-		for key, cur := range data {
-			isoCurrencies := strings.Split(key, "_")
-			*currencies = append(*currencies, currency_fetcher.Currency{
-				From:     isoCurrencies[0],
-				To:       isoCurrencies[1],
-				Provider: FreeConvProvider,
-				Rate:     cur,
-			})
-		}
-	}
 
-	for {
-		select {
-		case data, more := <-c:
-			handle(data, currencies)
-			if !more {
-				return
-			}
-		}
-	}
-}
-
-func (f FreeCurrConvFetcher) fetchCurrencies(client *http.Client, wg *sync.WaitGroup, currencies []string, channel chan<- map[string]float32, errorChannel chan<- error) {
-	defer wg.Done()
-	url := f.Url
+	url := f.URL
 
 	if url == "" {
-		url = FreeConvFetchUrl
+		url = FreeConvFetchURL
 	}
 
-	req, err := f.getData(url, currencies)
+	ctx := f.Ctx
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	req, formattedCurrencies, err := getData(ctx, url, currencies)
 
 	if err != nil {
 		errorChannel <- err
 		return
 	}
+
+	q := req.URL.Query()
+	q.Add("q", formattedCurrencies)
+	q.Add("compact", "ultra")
+	q.Add("apiKey", f.APIKey)
+
+	req.URL.RawQuery = q.Encode()
 
 	res, err := client.Do(req)
 
@@ -106,7 +62,10 @@ func (f FreeCurrConvFetcher) fetchCurrencies(client *http.Client, wg *sync.WaitG
 	}
 
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+
+	var body []byte
+	body, _ = ioutil.ReadAll(res.Body)
+
 	if res.StatusCode == http.StatusOK {
 		data := map[string]float32{}
 
@@ -115,63 +74,69 @@ func (f FreeCurrConvFetcher) fetchCurrencies(client *http.Client, wg *sync.WaitG
 			return
 		}
 		channel <- data
+
 		return
 	}
 
 	if res.StatusCode == http.StatusBadRequest {
-		errorResponse := struct {
-			Status int    `json:"status"`
-			Error  string `json:"error"`
-		}{}
-		_ = json.Unmarshal(body, &errorResponse)
+		errorRes := errorFreeConvResponse{}
+		_ = json.Unmarshal(body, &errorRes)
 
-		if strings.Contains(errorResponse.Error, "required") {
+		if strings.Contains(errorRes.Error, "required") {
 			errorChannel <- ErrUnAuthorized
 			return
 		}
 
-		if strings.Contains(errorResponse.Error, "API limit reached") {
-			errorChannel <- ErrApiLimitReached
+		if strings.Contains(errorRes.Error, "API limit reached") {
+			errorChannel <- ErrAPILimitReached
 		}
+
 		return
 	}
 
-	if res.StatusCode >= 400 && res.StatusCode < 500 {
+	if res.StatusCode >= http.StatusBadRequest && res.StatusCode < http.StatusInternalServerError {
 		errorChannel <- ErrClient
 		return
 	}
 
-	if res.StatusCode >= 500 {
+	if res.StatusCode >= http.StatusInternalServerError {
 		errorChannel <- ErrServer
 		return
 	}
 	errorChannel <- ErrUnknown
 }
 
-func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currency_fetcher.Currency, error) {
+func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currencyFetcher.Currency, error) {
+	var wg sync.WaitGroup
+
+	var appendWg sync.WaitGroup
+
 	numberOfRequests := len(currenciesToFetch) / f.MaxPerRequest
 	if numberOfRequests >= f.MaxPerHour {
 		return nil, ErrNotEnoughRequests
 	}
 
-	channel := make(chan map[string]float32, numberOfRequests)
+	channel := make(chan interface{}, numberOfRequests)
 	errorChannel := make(chan error)
-	currencies := make([]currency_fetcher.Currency, 0, len(currenciesToFetch))
-	var wg sync.WaitGroup
-	var appendWg sync.WaitGroup
+	currencies := make([]currencyFetcher.Currency, 0, len(currenciesToFetch))
+
 	client := &http.Client{}
 
 	appendWg.Add(1)
-	go appendToCurrencies(&appendWg, channel, &currencies)
+
+	go appendToCurrencies(&appendWg, channel, &currencies, currencyFetcher.FreeConvProvider)
 
 	idx := 0
+
 	for i := 0; i < numberOfRequests; i++ {
 		wg.Add(1)
+
 		go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+f.MaxPerRequest], channel, errorChannel)
+
 		idx += f.MaxPerRequest
 	}
 
-	go func(wg, appendWg *sync.WaitGroup, channel chan map[string]float32, errorChannel chan<- error) {
+	go func(wg, appendWg *sync.WaitGroup, channel currencyChannel, errorChannel chan<- error) {
 		wg.Wait()
 		close(channel)
 		appendWg.Wait()
@@ -179,12 +144,9 @@ func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currency_fetch
 		close(errorChannel)
 	}(&wg, &appendWg, channel, errorChannel)
 
-	select {
-	case err := <-errorChannel:
-		if err != nil {
-			return nil, err
-		}
-		return currencies, nil
+	if err := <-errorChannel; err != nil {
+		return nil, err
 	}
 
+	return currencies, nil
 }

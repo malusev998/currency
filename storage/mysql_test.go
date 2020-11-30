@@ -21,33 +21,34 @@ import (
 )
 
 type (
-	IdGeneratorMock struct {
+	IDGeneratorMock struct {
 		mock.Mock
 	}
-	IdGeneratorWithNullBytes struct {
+	IDGeneratorWithNullBytes struct {
 		mock.Mock
 	}
-	IdGeneratorWithLessBytes struct {
+	IDGeneratorWithLessBytes struct {
 		mock.Mock
 	}
 )
 
-func (i *IdGeneratorWithNullBytes) Generate() []byte {
+func (i *IDGeneratorWithNullBytes) Generate() []byte {
 	return nil
 }
 
-func (i *IdGeneratorWithLessBytes) Generate() []byte {
+func (i *IDGeneratorWithLessBytes) Generate() []byte {
 	bytes := make([]byte, 10)
 	_, _ = rand.Read(bytes)
+
 	return bytes
 }
 
-func (i *IdGeneratorMock) Generate() []byte {
+func (i *IDGeneratorMock) Generate() []byte {
 	bytes, _ := uuid.MustParse("8f8fa9e1-f854-4c94-9316-cdc561c8f536").MarshalBinary()
 	return bytes
 }
 
-func connectToMysql() (*sql.DB, error) {
+func mysqlConnectionString() string {
 	runningInDocker := false
 
 	if os.Getenv("RUNNING_IN_DOCKER") != "" {
@@ -65,17 +66,22 @@ func connectToMysql() (*sql.DB, error) {
 	} else {
 		mysqlDriverConfig.Addr = "localhost:3306"
 	}
-	connectionString := mysqlDriverConfig.FormatDSN()
+	return mysqlDriverConfig.FormatDSN()
+}
 
-	return sql.Open("mysql", connectionString)
+func connectToMysql() (*sql.DB, error) {
+	return sql.Open("mysql", mysqlConnectionString())
 }
 
 func seedMysql(ctx context.Context, db *sql.DB) error {
 	var builder strings.Builder
+
 	builder.WriteString("INSERT INTO currency_get_test(id, currency, provider, rate, created_at) VALUES ")
+
 	for i := 0; i < 100; i++ {
 		builder.WriteString(fmt.Sprintf("('%s','%s_%s','%s',%f,'%s'),", faker.UUIDHyphenated(), faker.Currency(), faker.Currency(), "TestProvider", rand.Float32(), time.Now().Add(-time.Duration(i)*time.Minute).Format(MySQLTimeFormat)))
 	}
+
 	builder.WriteString("('" + faker.UUIDHyphenated() + "',")
 	builder.WriteString("'EUR_USD', 'TestProvider', 1.8,")
 	builder.WriteString("'" + time.Now().Format(MySQLTimeFormat) + "'")
@@ -86,29 +92,29 @@ func seedMysql(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
-func TestMysqlStorage_Get(t *testing.T) {
-	t.Parallel()
-	asserts := require.New(t)
-	ctx := context.Background()
-	db, err := connectToMysql()
-	asserts.NotNil(db)
-	asserts.Nil(err)
-
-	defer db.ExecContext(ctx, "DROP TABLE currency_get_test;")
-
-	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS currency_get_test(
-		id binary(36) PRIMARY KEY,
-		currency varchar(20) NOT NULL,
-		provider varchar(30) NOT NULL,
-		rate float(8,4) NOT NULL,
-		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
-	);`)
-	asserts.Nil(err)
-	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
-	asserts.Nil(err)
-	asserts.Nil(seedMysql(ctx, db))
-
-}
+//func TestMysqlStorage_Get(t *testing.T) {
+//	t.Parallel()
+//	asserts := require.New(t)
+//	ctx := context.Background()
+//	db, err := connectToMysql()
+//	asserts.NotNil(db)
+//	asserts.Nil(err)
+//
+//	defer db.ExecContext(ctx, "DROP TABLE currency_get_test;")
+//
+//	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS currency_get_test(
+//		id binary(36) PRIMARY KEY,
+//		currency varchar(20) NOT NULL,
+//		provider varchar(30) NOT NULL,
+//		rate float(8,4) NOT NULL,
+//		created_at timestamp DEFAULT CURRENT_TIMESTAMP
+//	);`)
+//	asserts.Nil(err)
+//	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
+//	asserts.Nil(err)
+//	asserts.Nil(seedMysql(ctx, db))
+//
+//}
 
 func TestMysqlStorage_Store(t *testing.T) {
 	t.Parallel()
@@ -116,26 +122,19 @@ func TestMysqlStorage_Store(t *testing.T) {
 	ctx := context.Background()
 	asserts := require.New(t)
 
-	db, err := connectToMysql()
-	asserts.NotNil(db)
-	asserts.Nil(err)
-
-	defer db.ExecContext(ctx, "DROP TABLE currency_store_test;")
-
-	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS currency_store_test(
-		id binary(36) PRIMARY KEY,
-		currency varchar(20) NOT NULL,
-		provider varchar(30) NOT NULL,
-		rate float(8,4) NOT NULL,
-		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
-	);`)
-	asserts.Nil(err)
-	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
-	asserts.Nil(err)
-
 	t.Run("InsertOne", func(t *testing.T) {
-		generator := &IdGeneratorMock{}
-		storage := NewMySQLStorage(ctx, db, "currency_store_test", generator)
+		generator := &IDGeneratorMock{}
+		storage, _ := NewMySQLStorage(MySQLConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: true,
+			},
+			ConnectionString: mysqlConnectionString(),
+			TableName:        "currency_store_test_insert",
+			IDGenerator:      generator,
+		})
+		defer storage.Drop()
+
 		currencies, err := storage.Store([]currency_fetcher.Currency{
 			{
 				From:      "EUR",
@@ -149,11 +148,21 @@ func TestMysqlStorage_Store(t *testing.T) {
 		asserts.Nil(err)
 		asserts.NotNil(currencies)
 		asserts.Len(currencies, 1)
-		asserts.IsType(uuid.UUID{}, currencies[0].Id)
+		asserts.IsType(uuid.UUID{}, currencies[0].ID)
 	})
 
 	t.Run("InsertMany", func(t *testing.T) {
-		storage := NewMySQLStorage(ctx, db, "currency_store_test", nil)
+		storage, _ := NewMySQLStorage(MySQLConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: true,
+			},
+			ConnectionString: mysqlConnectionString(),
+			TableName:        "currency_store_test_insert_many",
+			IDGenerator:      nil,
+		})
+		defer storage.Drop()
+
 		currencies, err := storage.Store([]currency_fetcher.Currency{
 			{
 				From:      "EUR",
@@ -183,18 +192,27 @@ func TestMysqlStorage_Store(t *testing.T) {
 		asserts.Len(currencies, 3)
 
 		for _, cur := range currencies {
-			asserts.IsType(uuid.UUID{}, cur.Id)
+			asserts.IsType(uuid.UUID{}, cur.ID)
 		}
+
 	})
 
 	t.Run("Not enough bytes in id generator", func(t *testing.T) {
-		generators := []IdGenerator{
-			&IdGeneratorWithNullBytes{},
-			&IdGeneratorWithLessBytes{},
+		generators := []IDGenerator{
+			&IDGeneratorWithNullBytes{},
+			&IDGeneratorWithLessBytes{},
 		}
 
 		for _, gen := range generators {
-			storage := NewMySQLStorage(ctx, db, "currency_store_test", gen)
+			storage, _ := NewMySQLStorage(MySQLConfig{
+				BaseConfig: BaseConfig{
+					Cxt:     ctx,
+					Migrate: true,
+				},
+				ConnectionString: mysqlConnectionString(),
+				TableName:        "currency_store_test",
+				IDGenerator:      gen,
+			})
 			currencies, err := storage.Store([]currency_fetcher.Currency{
 				{
 					From:      "EUR",
@@ -208,6 +226,7 @@ func TestMysqlStorage_Store(t *testing.T) {
 			asserts.Nil(currencies)
 			asserts.NotNil(err)
 			asserts.True(errors.Is(err, ErrNotEnoughBytesInGenerator))
+			storage.Drop()
 		}
 	})
 }

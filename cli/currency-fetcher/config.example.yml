@@ -2,10 +2,16 @@ storage:
   - mysql
   - mongodb
 fetchers:
-  freecurrconv:
+  fetch:
+    - freecurrconversion
+    - exchangeratesapi
+  freecurrconversion:
+    url: https://free.currconv.com/api/v7/convert
     apiKey: 1234
     maxPerHour: 100
     maxPerRequest: 2
+  exchangeratesapi:
+    url: ''
 databases:
   mysql:
     addr: 127.0.0.1:3306

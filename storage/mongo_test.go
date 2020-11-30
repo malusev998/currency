@@ -2,17 +2,17 @@ package storage
 
 import (
 	"context"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	currency_fetcher "github.com/malusev998/currency-fetcher"
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 )
 
 func TestStoreInMongo(t *testing.T) {
@@ -46,34 +46,54 @@ func TestStoreInMongo(t *testing.T) {
 	t.Run("StoreOne", func(t *testing.T) {
 		database := client.Database("currency_fetcher_store_one")
 		defer database.Drop(ctx)
-		collection := database.Collection("currency")
-		storage := NewMongoStorage(ctx, collection)
 
-		currencies, err := storage.Store([]currency_fetcher.Currency{
+		storage, _ := NewMongoStorage(MongoDBConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: true,
+			},
+			ConnectionString: uri,
+			Database:         "currency_fetcher_store_one",
+			Collection:       "currency",
+		})
+		defer storage.Drop()
+
+		provider := currencyFetcher.Provider("TestProvider")
+
+		currencies, err := storage.Store([]currencyFetcher.Currency{
 			{
 				From:     "EUR",
 				To:       "USD",
-				Provider: "TestProvider",
+				Provider: provider,
 				Rate:     0.8,
 			},
 		})
 
 		asserts.Nil(err)
 		asserts.Len(currencies, 1)
-		asserts.NotNil(currencies[0].Id)
+		asserts.NotNil(currencies[0].ID)
 		asserts.Equal("EUR", currencies[0].From)
 		asserts.Equal("USD", currencies[0].To)
-		asserts.Equal("TestProvider", currencies[0].Provider)
+		asserts.Equal(provider, currencies[0].Provider)
 		asserts.Equal(float32(0.8), currencies[0].Rate)
 	})
 
 	t.Run("StoreMany", func(t *testing.T) {
 		database := client.Database("currency_fetcher_store_many")
 		defer database.Drop(ctx)
-		collection := database.Collection("currency")
-		storage := NewMongoStorage(ctx, collection)
 
-		currencies, err := storage.Store([]currency_fetcher.Currency{
+		storage, _ := NewMongoStorage(MongoDBConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: true,
+			},
+			ConnectionString: uri,
+			Database:         "currency_fetcher_store_many",
+			Collection:       "currency",
+		})
+		defer storage.Drop()
+
+		currencies, err := storage.Store([]currencyFetcher.Currency{
 			{
 				From:      "EUR",
 				To:        "USD",
@@ -92,10 +112,10 @@ func TestStoreInMongo(t *testing.T) {
 		asserts.Nil(err)
 		asserts.Len(currencies, 2)
 		for _, cur := range currencies {
-			asserts.NotNil(cur.Id)
+			asserts.NotNil(cur.ID)
 			asserts.Equal("EUR", cur.From)
 			asserts.Equal("USD", cur.To)
-			asserts.Equal("TestProvider", cur.Provider)
+			asserts.Equal(currencyFetcher.Provider("TestProvider"), cur.Provider)
 			asserts.Equal(float32(0.8), cur.Rate)
 		}
 	})
@@ -104,6 +124,8 @@ func TestStoreInMongo(t *testing.T) {
 func TestGetCurrenciesFromMongoDb(t *testing.T) {
 	t.Parallel()
 	runningInDocker := false
+	provider := currencyFetcher.Provider("TestProvider")
+	otherProvider := currencyFetcher.Provider("OtherProvider")
 
 	if os.Getenv("RUNNING_IN_DOCKER") != "" {
 		runningInDocker = true
@@ -137,7 +159,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		currenciesToInsert = append(currenciesToInsert, map[string]interface{}{
 			"currency":  "EUR_USD",
-			"provider":  "TestProvider",
+			"provider":  provider,
 			"rate":      rand.Float32(),
 			"createdAt": time.Now(),
 		})
@@ -146,38 +168,65 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 	asserts.NotNil(results)
 	asserts.Nil(err)
 
+	defer collection.Drop(ctx)
+
 	t.Run("GetAllCurrenciesPaginated", func(t *testing.T) {
-		storage := NewMongoStorage(ctx, collection)
+		storage, _ := NewMongoStorage(MongoDBConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: false,
+			},
+			ConnectionString: uri,
+			Database:         "currency_fetcher_fetch",
+			Collection:       "currency",
+		})
 		currencies, err := storage.Get("EUR", "USD", 1, 10)
 		asserts.Nil(err)
 		asserts.NotNil(currencies)
 		asserts.Len(currencies, 10)
 
 		for _, cur := range currencies {
-			asserts.NotNil(cur.Id)
-			asserts.IsType(primitive.ObjectID{}, cur.Id)
-			asserts.Equal("TestProvider", cur.Provider)
+			asserts.NotNil(cur.ID)
+			asserts.IsType(primitive.ObjectID{}, cur.ID)
+			asserts.Equal(provider, cur.Provider)
 			asserts.Equal("EUR", cur.From)
 			asserts.Equal("USD", cur.To)
 		}
 	})
 
 	t.Run("GetWithProvider", func(t *testing.T) {
-		storage := NewMongoStorage(ctx, collection)
-		currencies, err := storage.GetByProvider("EUR", "USD", "TestProvider", 1, 10)
+		storage, _ := NewMongoStorage(MongoDBConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: false,
+			},
+			ConnectionString: uri,
+			Database:         "currency_fetcher_fetch",
+			Collection:       "currency",
+		})
+		currencies, err := storage.GetByProvider("EUR", "USD", provider, 1, 10)
 		asserts.Nil(err)
 		asserts.NotNil(currencies)
 		asserts.Len(currencies, 10)
 
 		for _, cur := range currencies {
-			asserts.Equal("TestProvider", cur.Provider)
+			asserts.Equal(provider, cur.Provider)
 			asserts.Equal("EUR", cur.From)
 			asserts.Equal("USD", cur.To)
 		}
 	})
 
 	t.Run("GetWithNonExistentProvider", func(t *testing.T) {
-		storage := NewMongoStorage(ctx, collection)
+		storage, _ := NewMongoStorage(MongoDBConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: false,
+			},
+			ConnectionString: uri,
+			Database:         "currency_fetcher_fetch",
+			Collection:       "currency",
+		})
+
 		currencies, err := storage.GetByProvider("EUR", "USD", "NonExistentProvider", 1, 10)
 		asserts.Nil(err)
 		asserts.NotNil(currencies)
@@ -191,7 +240,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 			duration := time.Minute * time.Duration(i)
 			toInsert = append(toInsert, map[string]interface{}{
 				"currency":  "EUR_USD",
-				"provider":  "OtherProvider",
+				"provider":  otherProvider,
 				"rate":      rand.Float32(),
 				"createdAt": now.Add(duration),
 			})
@@ -202,7 +251,15 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 		asserts.Nil(err)
 
 		inFuture := now.Add(time.Duration(10) * time.Minute)
-		storage := NewMongoStorage(ctx, collection)
+		storage, _ := NewMongoStorage(MongoDBConfig{
+			BaseConfig: BaseConfig{
+				Cxt:     ctx,
+				Migrate: false,
+			},
+			ConnectionString: uri,
+			Database:         "currency_fetcher_fetch",
+			Collection:       "currency",
+		})
 		currencies, err := storage.GetByDate("EUR", "USD", inFuture.Add(time.Duration(-5)*time.Minute), inFuture, 1, 10)
 		asserts.Nil(err)
 		asserts.NotNil(currencies)

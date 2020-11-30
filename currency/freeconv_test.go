@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	currency_fetcher "github.com/malusev998/currency-fetcher"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -66,8 +67,8 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 		asserts := require.New(t)
 		required := []string{"USD_EUR", "EUR_USD", "EUR_RSD", "RSD_EUR"}
 		fetcher := FreeCurrConvFetcher{
-			Url:           server.URL,
-			ApiKey:        "1234566789",
+			URL:           server.URL,
+			APIKey:        "1234566789",
 			MaxPerHour:    300,
 			MaxPerRequest: 2,
 		}
@@ -79,7 +80,7 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			pair := fmt.Sprintf("%s_%s", currencies[i].From, currencies[i].To)
 			asserts.Contains(Currencies, pair)
-			asserts.Equal(FreeConvProvider, currencies[i].Provider)
+			asserts.Equal(currency_fetcher.FreeConvProvider, currencies[i].Provider)
 			asserts.Equal(Currencies[pair], currencies[i].Rate)
 		}
 	})
@@ -87,8 +88,8 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 	t.Run("API key not found", func(t *testing.T) {
 		asserts := require.New(t)
 		fetcher := FreeCurrConvFetcher{
-			Url:           server.URL,
-			ApiKey:        "",
+			URL:           server.URL,
+			APIKey:        "",
 			MaxPerHour:    300,
 			MaxPerRequest: 2,
 		}
@@ -103,8 +104,8 @@ func TestFreeCurrConvFetcher_Fetch(t *testing.T) {
 	t.Run("Not enough requests", func(t *testing.T) {
 		asserts := require.New(t)
 		fetcher := FreeCurrConvFetcher{
-			Url:           server.URL,
-			ApiKey:        "",
+			URL:           server.URL,
+			APIKey:        "",
 			MaxPerHour:    1,
 			MaxPerRequest: 2,
 		}
@@ -124,8 +125,8 @@ func TestApiLimitReached(t *testing.T) {
 
 	asserts := require.New(t)
 	fetcher := FreeCurrConvFetcher{
-		Url:           server.URL,
-		ApiKey:        "1234567890",
+		URL:           server.URL,
+		APIKey:        "1234567890",
 		MaxPerHour:    300,
 		MaxPerRequest: 2,
 	}
@@ -134,7 +135,7 @@ func TestApiLimitReached(t *testing.T) {
 
 	asserts.Nil(currencies)
 	asserts.NotNil(err)
-	asserts.True(errors.Is(err, ErrApiLimitReached))
+	asserts.True(errors.Is(err, ErrAPILimitReached))
 }
 
 func TestClientError(t *testing.T) {
@@ -145,8 +146,8 @@ func TestClientError(t *testing.T) {
 
 	asserts := require.New(t)
 	fetcher := FreeCurrConvFetcher{
-		Url:           server.URL,
-		ApiKey:        "1234567890",
+		URL:           server.URL,
+		APIKey:        "1234567890",
 		MaxPerHour:    300,
 		MaxPerRequest: 2,
 	}
@@ -166,8 +167,8 @@ func TestServerError(t *testing.T) {
 
 	asserts := require.New(t)
 	fetcher := FreeCurrConvFetcher{
-		Url:           server.URL,
-		ApiKey:        "1234567890",
+		URL:           server.URL,
+		APIKey:        "1234567890",
 		MaxPerHour:    300,
 		MaxPerRequest: 2,
 	}
