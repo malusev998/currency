@@ -11,7 +11,7 @@ import (
 
 var (
 	rootCmd = &cobra.Command{
-		Use:     "currency-fetcher",
+		Use:     "fetchers-fetcher",
 		Short:   "ISO Currency rate fetcher",
 		Version: "v1.1.0",
 	}

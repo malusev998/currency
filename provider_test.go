@@ -1,1 +1,1 @@
-package currency_fetcher_test
+package currency_test

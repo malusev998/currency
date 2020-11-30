@@ -36,7 +36,7 @@ func (m mongoStorage) GetByDate(from, to string, start, end time.Time, page, per
 
 func (m mongoStorage) GetByDateAndProvider(from, to string, provider currencyFetcher.Provider, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
 	filter := bson.M{
-		"currency": fmt.Sprintf("%s_%s", from, to),
+		"fetchers": fmt.Sprintf("%s_%s", from, to),
 		"createdAt": bson.M{
 			"$gte": start,
 			"$lt":  end,
@@ -66,7 +66,7 @@ func (m mongoStorage) GetByDateAndProvider(from, to string, provider currencyFet
 
 	for cursor.Next(m.ctx) {
 		current := cursor.Current
-		isoCurrencies := strings.Split(current.Lookup("currency").StringValue(), "_")
+		isoCurrencies := strings.Split(current.Lookup("fetchers").StringValue(), "_")
 		currencies = append(currencies, currencyFetcher.CurrencyWithID{
 			Currency: currencyFetcher.Currency{
 				From:      isoCurrencies[0],
@@ -92,7 +92,7 @@ func (m mongoStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 		}
 
 		currenciesToInsert = append(currenciesToInsert, bson.M{
-			"currency":  fmt.Sprintf("%s_%s", cur.From, cur.To),
+			"fetchers":  fmt.Sprintf("%s_%s", cur.From, cur.To),
 			"rate":      cur.Rate,
 			"provider":  cur.Provider,
 			"createdAt": createdAt,
@@ -120,7 +120,7 @@ func (m mongoStorage) Migrate() error {
 	_, err := m.collection.Indexes().CreateOne(m.ctx, mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{
-				Key:   "currency",
+				Key:   "fetchers",
 				Value: bsonx.Int32(1),
 			},
 			{
@@ -138,7 +138,7 @@ func (m mongoStorage) Migrate() error {
 	_, err = m.collection.Indexes().CreateOne(m.ctx, mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{
-				Key:   "currency",
+				Key:   "fetchers",
 				Value: bsonx.Int32(1),
 			},
 			{

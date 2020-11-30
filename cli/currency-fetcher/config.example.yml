@@ -15,14 +15,14 @@ fetchers:
 databases:
   mysql:
     addr: 127.0.0.1:3306
-    user: currency
-    password: currency
+    user: fetchers
+    password: fetchers
     db: currencydb
-    table: currency
+    table: fetchers
   mongo:
     uri: mongodb://localhost:27017
     db: currencydb
-    collection: currency
+    collection: fetchers
 migrate: true
 currencies:
   - EUR_RSD

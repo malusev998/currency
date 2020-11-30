@@ -68,7 +68,7 @@ func (m mysqlStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 		})
 	}
 
-	stmt, err := tx.PrepareContext(m.ctx, fmt.Sprintf("INSERT INTO %s(id, currency, provider, rate, created_at) VALUES %s;", m.tableName, strings.TrimRight(builder.String(), ", ")))
+	stmt, err := tx.PrepareContext(m.ctx, fmt.Sprintf("INSERT INTO %s(id, fetchers, provider, rate, created_at) VALUES %s;", m.tableName, strings.TrimRight(builder.String(), ", ")))
 
 	if err != nil {
 		_ = tx.Rollback()
@@ -114,9 +114,9 @@ func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFet
 
 	var builder strings.Builder
 
-	builder.WriteString("SELECT id,currency,provider,rate,created_at FROM ")
+	builder.WriteString("SELECT id,fetchers,provider,rate,created_at FROM ")
 	builder.WriteString(m.tableName)
-	builder.WriteString(" WHERE currency = ? AND created_at BETWEEN ? AND ?")
+	builder.WriteString(" WHERE fetchers = ? AND created_at BETWEEN ? AND ?")
 
 	if provider != "" {
 		builder.WriteString(" AND provider = ?")
@@ -160,7 +160,7 @@ func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFet
 func (m mysqlStorage) Migrate() error {
 	_, err := m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s(
 		id binary(36) PRIMARY KEY,
-		currency varchar(20) NOT NULL,
+		fetchers varchar(20) NOT NULL,
 		provider varchar(30) NOT NULL,
 		rate float(8,4) NOT NULL,
 		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
@@ -170,7 +170,7 @@ func (m mysqlStorage) Migrate() error {
 		return err
 	}
 
-	_, err = m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE INDEX IF NOT EXISTS search_index ON %s(currency, provider, created_at);`, m.tableName))
+	_, err = m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE INDEX IF NOT EXISTS search_index ON %s(fetchers, provider, created_at);`, m.tableName))
 	return err
 }
 

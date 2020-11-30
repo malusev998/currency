@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	currencyFetcher "github.com/malusev998/currency-fetcher"
-	"github.com/malusev998/currency-fetcher/currency"
+	"github.com/malusev998/currency-fetcher/fetchers"
 	"github.com/malusev998/currency-fetcher/storage"
 )
 
@@ -82,14 +82,14 @@ func getConfig(ctx context.Context) (*Config, error) {
 			},
 		},
 		FetchersConfig: map[currencyFetcher.Provider]interface{}{
-			currencyFetcher.ExchangeRatesAPIProvider: currency.ExchangeRatesAPIConfig{
-				BaseConfig: currency.BaseConfig{
+			currencyFetcher.ExchangeRatesAPIProvider: fetchers.ExchangeRatesAPIConfig{
+				BaseConfig: fetchers.BaseConfig{
 					Ctx: ctx,
 					URL: viper.GetString("fetchers.exchangeratesapi"),
 				},
 			},
-			currencyFetcher.FreeConvProvider: currency.FreeConvServiceConfig{
-				BaseConfig: currency.BaseConfig{
+			currencyFetcher.FreeConvProvider: fetchers.FreeConvServiceConfig{
+				BaseConfig: fetchers.BaseConfig{
 					Ctx: ctx,
 					URL: fetcherConfig["url"],
 				},

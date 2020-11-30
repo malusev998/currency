@@ -1,4 +1,4 @@
-package currency_fetcher
+package currency
 
 type (
 	Fetcher interface {

@@ -1,20 +1,19 @@
-package currency
+package fetchers
 
 import (
 	"context"
 	"encoding/json"
+	currencyFetcher "github.com/malusev998/currency-fetcher"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"sync"
-
-	currencyFetcher "github.com/malusev998/currency-fetcher"
 )
 
 type (
 	ExchangeRatesAPIFetcher struct {
-		BaseCurrencies []string
-		Ctx            context.Context
-		URL            string
+		Ctx context.Context
+		URL string
 	}
 )
 
@@ -84,23 +83,35 @@ func (e ExchangeRatesAPIFetcher) fetchCurrencies(
 	}
 }
 
+func (e ExchangeRatesAPIFetcher) PrepareISOCurrencies(currencies []string) map[string][]string {
+	mappedCurrencies := make(map[string][]string)
+	var cs []string
+	var exists bool
+	for _, c := range currencies {
+		isoCurrency := strings.Split(c, "_")
+		if cs, exists = mappedCurrencies[isoCurrency[0]]; exists && len(cs) != 0 {
+			cs = append(cs, isoCurrency[1])
+		} else {
+			cs = []string{isoCurrency[1]}
+		}
+		mappedCurrencies[isoCurrency[0]] = cs
+	}
+	return mappedCurrencies
+}
+
 func (e ExchangeRatesAPIFetcher) Fetch(currenciesToFetch []string) ([]currencyFetcher.Currency, error) {
 	var wg sync.WaitGroup
-
 	var appendWg sync.WaitGroup
+	currencies := e.PrepareISOCurrencies(currenciesToFetch)
 
-	numberOfCurrenciesToFetch := len(currenciesToFetch) * len(e.BaseCurrencies)
-
-	channel := make(currencyChannel, len(e.BaseCurrencies))
+	channel := make(currencyChannel, len(currencies))
 	errorChannel := make(chan error)
-	currencies := make([]currencyFetcher.Currency, 0, numberOfCurrenciesToFetch)
-
+	result := make([]currencyFetcher.Currency, 0)
+	//
 	client := &http.Client{}
 
 	appendWg.Add(1)
-
-	go appendToCurrencies(&appendWg, channel, &currencies, currencyFetcher.ExchangeRatesAPIProvider)
-
+	go appendToCurrencies(&appendWg, channel, &result, currencyFetcher.ExchangeRatesAPIProvider)
 	url := e.URL
 
 	if url == "" {
@@ -116,8 +127,8 @@ func (e ExchangeRatesAPIFetcher) Fetch(currenciesToFetch []string) ([]currencyFe
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	for _, base := range e.BaseCurrencies {
-		go e.fetchCurrencies(ctx, client, channel, errorChannel, url, base, currenciesToFetch)
+	for base, curs := range currencies {
+		go e.fetchCurrencies(ctx, client, channel, errorChannel, url, base, curs)
 	}
 
 	go func(wg, appendWg *sync.WaitGroup, channel currencyChannel, errorChannel chan<- error) {
@@ -132,5 +143,5 @@ func (e ExchangeRatesAPIFetcher) Fetch(currenciesToFetch []string) ([]currencyFe
 		return nil, err
 	}
 
-	return currencies, nil
+	return result, nil
 }

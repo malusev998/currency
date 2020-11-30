@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	currencyFetcher "github.com/malusev998/currency-fetcher"
-	"github.com/malusev998/currency-fetcher/currency"
+	"github.com/malusev998/currency-fetcher/fetchers"
 	"github.com/malusev998/currency-fetcher/services"
 	"github.com/malusev998/currency-fetcher/storage"
 )
@@ -51,8 +51,8 @@ func storages(t *testing.T, ctx context.Context) ([]currencyFetcher.Storage, *sq
 	}
 
 	mysqlDriverConfig := mysql.NewConfig()
-	mysqlDriverConfig.User = "currency"
-	mysqlDriverConfig.Passwd = "currency"
+	mysqlDriverConfig.User = "fetchers"
+	mysqlDriverConfig.Passwd = "fetchers"
 	mysqlDriverConfig.DBName = "currencydb"
 
 	mysqlDriverConfig.Net = "tcp"
@@ -124,8 +124,8 @@ func TestFetchCommand(t *testing.T) {
 
 	currencyService := []currencyFetcher.Service{
 		services.Service{
-			Fetcher: currency.NewCurrencyFetcher(currencyFetcher.FreeConvProvider, currency.FreeConvServiceConfig{
-				BaseConfig: currency.BaseConfig{
+			Fetcher: fetchers.NewCurrencyFetcher(currencyFetcher.FreeConvProvider, fetchers.FreeConvServiceConfig{
+				BaseConfig: fetchers.BaseConfig{
 					Ctx: ctx,
 					URL: server.URL,
 				},

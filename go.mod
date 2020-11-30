@@ -1,12 +1,12 @@
-module github.com/malusev998/currency-fetcher
+module github.com/malusev998/currency
 
 go 1.15
 
 require (
 	github.com/bxcodec/faker/v3 v3.5.0
-	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/google/uuid v1.1.2
+	github.com/malusev998/currency-fetcher v0.0.0-20201130094103-bcdc212adb57
 	github.com/shopspring/decimal v1.2.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.1

@@ -56,8 +56,8 @@ func mysqlConnectionString() string {
 	}
 
 	mysqlDriverConfig := mysql.NewConfig()
-	mysqlDriverConfig.User = "currency"
-	mysqlDriverConfig.Passwd = "currency"
+	mysqlDriverConfig.User = "fetchers"
+	mysqlDriverConfig.Passwd = "fetchers"
 	mysqlDriverConfig.DBName = "currencydb"
 	mysqlDriverConfig.Net = "tcp"
 
@@ -76,7 +76,7 @@ func connectToMysql() (*sql.DB, error) {
 func seedMysql(ctx context.Context, db *sql.DB) error {
 	var builder strings.Builder
 
-	builder.WriteString("INSERT INTO currency_get_test(id, currency, provider, rate, created_at) VALUES ")
+	builder.WriteString("INSERT INTO currency_get_test(id, fetchers, provider, rate, created_at) VALUES ")
 
 	for i := 0; i < 100; i++ {
 		builder.WriteString(fmt.Sprintf("('%s','%s_%s','%s',%f,'%s'),", faker.UUIDHyphenated(), faker.Currency(), faker.Currency(), "TestProvider", rand.Float32(), time.Now().Add(-time.Duration(i)*time.Minute).Format(MySQLTimeFormat)))
@@ -104,13 +104,13 @@ func seedMysql(ctx context.Context, db *sql.DB) error {
 //
 //	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS currency_get_test(
 //		id binary(36) PRIMARY KEY,
-//		currency varchar(20) NOT NULL,
+//		fetchers varchar(20) NOT NULL,
 //		provider varchar(30) NOT NULL,
 //		rate float(8,4) NOT NULL,
 //		created_at timestamp DEFAULT CURRENT_TIMESTAMP
 //	);`)
 //	asserts.Nil(err)
-//	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(currency, provider, created_at);`)
+//	_, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS search_index ON currency_store_test(fetchers, provider, created_at);`)
 //	asserts.Nil(err)
 //	asserts.Nil(seedMysql(ctx, db))
 //

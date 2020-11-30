@@ -34,7 +34,7 @@ func main() {
 	fetchServices, err := createCurrencyService(config, storages)
 
 	if err != nil {
-		log.Fatalf("Error while creating currency services: %v\n", err)
+		log.Fatalf("Error while creating fetchers services: %v\n", err)
 	}
 
 	signalChannel := make(chan os.Signal, 1)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	currencyFetcher "github.com/malusev998/currency-fetcher"
-	"github.com/malusev998/currency-fetcher/currency"
+	"github.com/malusev998/currency-fetcher/fetchers"
 	service "github.com/malusev998/currency-fetcher/services"
 	"github.com/malusev998/currency-fetcher/storage"
 )
@@ -40,7 +40,7 @@ func createCurrencyService(config *Config, storages []currencyFetcher.Storage) (
 		}
 
 		services = append(services, service.Service{
-			Fetcher: currency.NewCurrencyFetcher(f, c),
+			Fetcher: fetchers.NewCurrencyFetcher(f, c),
 			Storage: storages,
 		})
 	}

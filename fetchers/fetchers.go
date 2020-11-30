@@ -1,4 +1,4 @@
-package currency
+package fetchers
 
 import (
 	"context"
@@ -71,7 +71,6 @@ func appendToCurrencies(
 		case map[string]float32:
 			for key, cur := range casted {
 				isoCurrencies := strings.Split(key, "_")
-
 				*currencies = append(*currencies, currencyFetcher.Currency{
 					From:     isoCurrencies[0],
 					To:       isoCurrencies[1],

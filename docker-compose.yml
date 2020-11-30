@@ -19,8 +19,8 @@ services:
       - mysql_currency_fetcher:/var/lib/mysql
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: generate-random-password
-      MYSQL_USER: currency
-      MYSQL_PASSWORD: currency
+      MYSQL_USER: fetchers
+      MYSQL_PASSWORD: fetchers
       MYSQL_DATABASE: currencydb
       MYSQL_ROOT_HOST: '%'
     restart: unless-stopped
@@ -32,7 +32,7 @@ services:
 #      - currency_fetcher
 #    restart: unless-stopped
 #    volumes:
-#      - ./cli/currency-fetcher/config.yml:/currency-fetcher/config.yml
+#      - ./cli/fetchers-fetcher/config.yml:/fetchers-fetcher/config.yml
 #    depends_on:
 #      - mongo
 #      - mysql

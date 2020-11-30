@@ -1,4 +1,4 @@
-package currency
+package fetchers
 
 import (
 	"context"

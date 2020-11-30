@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ErrCurrencyNotFound  = errors.New("rate for the currency is not found in storage")
+	ErrCurrencyNotFound  = errors.New("rate for the fetchers is not found in storage")
 	ErrNoStorageProvided = errors.New("no storage provided")
 	ErrTimeRanOut        = errors.New("time has run out")
 )

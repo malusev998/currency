@@ -54,7 +54,7 @@ func TestStoreInMongo(t *testing.T) {
 			},
 			ConnectionString: uri,
 			Database:         "currency_fetcher_store_one",
-			Collection:       "currency",
+			Collection:       "fetchers",
 		})
 		defer storage.Drop()
 
@@ -89,7 +89,7 @@ func TestStoreInMongo(t *testing.T) {
 			},
 			ConnectionString: uri,
 			Database:         "currency_fetcher_store_many",
-			Collection:       "currency",
+			Collection:       "fetchers",
 		})
 		defer storage.Drop()
 
@@ -152,13 +152,13 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 
 	database := client.Database("currency_fetcher_fetch")
 	defer database.Drop(ctx)
-	collection := database.Collection("currency")
+	collection := database.Collection("fetchers")
 
 	var currenciesToInsert []interface{}
 
 	for i := 0; i < 10; i++ {
 		currenciesToInsert = append(currenciesToInsert, map[string]interface{}{
-			"currency":  "EUR_USD",
+			"fetchers":  "EUR_USD",
 			"provider":  provider,
 			"rate":      rand.Float32(),
 			"createdAt": time.Now(),
@@ -178,7 +178,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 			},
 			ConnectionString: uri,
 			Database:         "currency_fetcher_fetch",
-			Collection:       "currency",
+			Collection:       "fetchers",
 		})
 		currencies, err := storage.Get("EUR", "USD", 1, 10)
 		asserts.Nil(err)
@@ -202,7 +202,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 			},
 			ConnectionString: uri,
 			Database:         "currency_fetcher_fetch",
-			Collection:       "currency",
+			Collection:       "fetchers",
 		})
 		currencies, err := storage.GetByProvider("EUR", "USD", provider, 1, 10)
 		asserts.Nil(err)
@@ -224,7 +224,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 			},
 			ConnectionString: uri,
 			Database:         "currency_fetcher_fetch",
-			Collection:       "currency",
+			Collection:       "fetchers",
 		})
 
 		currencies, err := storage.GetByProvider("EUR", "USD", "NonExistentProvider", 1, 10)
@@ -239,7 +239,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			duration := time.Minute * time.Duration(i)
 			toInsert = append(toInsert, map[string]interface{}{
-				"currency":  "EUR_USD",
+				"fetchers":  "EUR_USD",
 				"provider":  otherProvider,
 				"rate":      rand.Float32(),
 				"createdAt": now.Add(duration),
@@ -258,7 +258,7 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 			},
 			ConnectionString: uri,
 			Database:         "currency_fetcher_fetch",
-			Collection:       "currency",
+			Collection:       "fetchers",
 		})
 		currencies, err := storage.GetByDate("EUR", "USD", inFuture.Add(time.Duration(-5)*time.Minute), inFuture, 1, 10)
 		asserts.Nil(err)
