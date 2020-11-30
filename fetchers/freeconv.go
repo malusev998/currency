@@ -116,7 +116,7 @@ func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currencyFetche
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	if len(currenciesToFetch) <= f.MaxPerRequest {
+	if len(currenciesToFetch) < f.MaxPerRequest {
 		numberOfRequests = len(currenciesToFetch)
 	} else {
 		numberOfRequests = len(currenciesToFetch) / f.MaxPerRequest
@@ -142,7 +142,7 @@ func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currencyFetche
 	for i := 0; i < numberOfRequests; i++ {
 		wg.Add(1)
 
-		if numberOfRequests <= f.MaxPerRequest {
+		if numberOfRequests < f.MaxPerRequest {
 			go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+1], channel, errorChannel)
 		} else {
 			go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+f.MaxPerRequest], channel, errorChannel)
