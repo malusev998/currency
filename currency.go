@@ -5,4 +5,3 @@ type (
 		Fetch(currenciesToFetch []string) ([]Currency, error)
 	}
 )
-

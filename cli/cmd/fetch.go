@@ -7,26 +7,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func handleCurrencySave(config *Config, logger *log.Logger) error {
+func handleCurrencySave(config *Config, logger *log.Logger) []error {
+	errs := make([]error, 0)
+
 	for _, service := range config.CurrencyService {
 		currenciesMap, err := service.Save(config.CurrenciesToFetch)
 
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
 
-		if !*config.debug {
-			return nil
-		}
-
-		for storage, currencies := range currenciesMap {
-			for i, currency := range currencies {
-				logger.Printf("%d\tCurrency %s_%s saved to %s: Rate: %f\n", i, currency.From, currency.To, storage, currency.Rate)
+		if *config.debug {
+			for storage, currencies := range currenciesMap {
+				for i, currency := range currencies {
+					logger.Printf("%d\tCurrency %s_%s saved to %s: Rate: %f\n", i, currency.From, currency.To, storage, currency.Rate)
+				}
 			}
 		}
 	}
 
-	return nil
+	return errs
 }
 
 func fetchCobraCommand(
@@ -36,8 +36,10 @@ func fetchCobraCommand(
 	errLogger *log.Logger,
 ) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
-		if err := handleCurrencySave(config, logger); err != nil {
-			errLogger.Printf("ERROR: %v", err)
+		if errs := handleCurrencySave(config, logger); len(errs) != 0 {
+			for _, err := range errs {
+				errLogger.Printf("ERROR: %v", err)
+			}
 		}
 
 		if !standalone {
@@ -47,8 +49,10 @@ func fetchCobraCommand(
 		for {
 			select {
 			case <-time.After(after):
-				if err := handleCurrencySave(config, logger); err != nil {
-					errLogger.Printf("ERROR: %v", err)
+				if errs := handleCurrencySave(config, logger); len(errs) != 0 {
+					for _, err := range errs {
+						errLogger.Printf("ERROR: %v", err)
+					}
 				}
 			case <-config.Ctx.Done():
 				return

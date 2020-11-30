@@ -17,9 +17,11 @@ import (
 const MongoDBProviderName = "mongodb"
 
 type mongoStorage struct {
-	client     *mongo.Client
-	ctx        context.Context
-	collection *mongo.Collection
+	client         *mongo.Client
+	db             *mongo.Database
+	ctx            context.Context
+	collection     *mongo.Collection
+	collectionName string
 }
 
 func (m mongoStorage) Get(from, to string, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
@@ -117,6 +119,11 @@ func (m mongoStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 }
 
 func (m mongoStorage) Migrate() error {
+	if err := m.db.CreateCollection(m.ctx, m.collectionName); err != nil {
+		if _, ok := err.(mongo.CommandError); !ok {
+			return fmt.Errorf("error while creating mongodb collection: %v", err)
+		}
+	}
 	_, err := m.collection.Indexes().CreateOne(m.ctx, mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{
@@ -168,6 +175,7 @@ func (m *mongoStorage) Close() error {
 	if err := m.client.Disconnect(m.ctx); err != nil {
 		return fmt.Errorf("disconnecting from mongodb failed: %v", err)
 	}
+
 	return nil
 }
 
@@ -186,24 +194,18 @@ func NewMongoStorage(c MongoDBConfig) (currencyFetcher.Storage, error) {
 	collection := db.Collection(c.Collection)
 
 	storage := &mongoStorage{
-		client:     mongoDbClient,
-		ctx:        c.Cxt,
-		collection: collection,
+		db:             db,
+		client:         mongoDbClient,
+		ctx:            c.Cxt,
+		collection:     collection,
+		collectionName: c.Collection,
 	}
 
 	if c.Migrate {
-		if err := db.CreateCollection(c.Cxt, c.Collection); err != nil {
-			if _, ok := err.(mongo.CommandError); !ok {
-				return nil, fmt.Errorf("error while creating mongodb collection: %v", err)
-			}
-			return nil, err
-		}
-
 		if err := storage.Migrate(); err != nil {
 			return nil, fmt.Errorf("error while migrating mongodb collection: %v", err)
 		}
 	}
 
 	return storage, nil
-
 }

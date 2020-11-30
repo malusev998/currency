@@ -40,8 +40,11 @@ func (m mysqlStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 	}
 
 	var builder strings.Builder
+
 	bind := make([]interface{}, 0, 5*len(currency))
+
 	data := make([]currencyFetcher.CurrencyWithID, 0, len(currency))
+
 	for _, cur := range currency {
 		var id uuid.UUID
 		if m.idGenerator == nil {
@@ -56,11 +59,14 @@ func (m mysqlStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 				return nil, err
 			}
 		}
+
 		createdAt := cur.CreatedAt
 		if createdAt.IsZero() {
 			createdAt = time.Now()
 		}
+
 		builder.WriteString("(?,?,?,?,?),")
+
 		bind = append(bind, id, fmt.Sprintf("%s_%s", cur.From, cur.To), cur.Provider, cur.Rate, createdAt)
 		data = append(data, currencyFetcher.CurrencyWithID{
 			Currency: cur,
@@ -68,7 +74,11 @@ func (m mysqlStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 		})
 	}
 
-	stmt, err := tx.PrepareContext(m.ctx, fmt.Sprintf("INSERT INTO %s(id, fetchers, provider, rate, created_at) VALUES %s;", m.tableName, strings.TrimRight(builder.String(), ", ")))
+	stmt, err := tx.PrepareContext(m.ctx, fmt.Sprintf(
+		"INSERT INTO %s(id, currency, provider, rate, created_at) VALUES %s;",
+		m.tableName,
+		strings.TrimRight(builder.String(), ", ")),
+	)
 
 	if err != nil {
 		_ = tx.Rollback()
@@ -114,9 +124,9 @@ func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFet
 
 	var builder strings.Builder
 
-	builder.WriteString("SELECT id,fetchers,provider,rate,created_at FROM ")
+	builder.WriteString("SELECT id,currency,provider,rate,created_at FROM ")
 	builder.WriteString(m.tableName)
-	builder.WriteString(" WHERE fetchers = ? AND created_at BETWEEN ? AND ?")
+	builder.WriteString(" WHERE currency = ? AND created_at BETWEEN ? AND ?")
 
 	if provider != "" {
 		builder.WriteString(" AND provider = ?")
@@ -130,7 +140,7 @@ func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFet
 		return nil, err
 	}
 
-	rows, err := stmt.Query(fmt.Sprintf("%s_%s", from, to), start.Format(MySQLTimeFormat), end.Format(MySQLTimeFormat), perPage, (page-1)*perPage)
+	rows, err := stmt.Query(fmt.Sprintf("%s_%s", from, to), start.Format(MySQLTimeFormat), end.Format(MySQLTimeFormat), (page-1)*perPage, perPage)
 
 	if err != nil {
 		return nil, err
@@ -139,19 +149,22 @@ func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFet
 	defer rows.Close()
 
 	result := make([]currencyFetcher.CurrencyWithID, 0, perPage)
+
 	for rows.Next() {
 		var currency string
 		var createdAt string
-		currencyWithId := currencyFetcher.CurrencyWithID{}
-		if err := rows.Scan(&currencyWithId.ID, currency, &currencyWithId.Provider, &currencyWithId.Rate, &createdAt); err != nil {
+
+		currencyWithID := currencyFetcher.CurrencyWithID{}
+
+		if err := rows.Scan(&currencyWithID.ID, &currency, &currencyWithID.Provider, &currencyWithID.Rate, &createdAt); err != nil {
 			return nil, err
 		}
 
-		currencyWithId.CreatedAt, _ = time.Parse(MySQLTimeFormat, createdAt)
+		currencyWithID.CreatedAt, _ = time.Parse(MySQLTimeFormat, createdAt)
 		isoCurrencies := strings.Split(currency, "_")
-		currencyWithId.From = isoCurrencies[0]
-		currencyWithId.To = isoCurrencies[1]
-		result = append(result, currencyWithId)
+		currencyWithID.From = isoCurrencies[0]
+		currencyWithID.To = isoCurrencies[1]
+		result = append(result, currencyWithID)
 	}
 
 	return result, nil
@@ -160,7 +173,7 @@ func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFet
 func (m mysqlStorage) Migrate() error {
 	_, err := m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s(
 		id binary(36) PRIMARY KEY,
-		fetchers varchar(20) NOT NULL,
+		currency varchar(20) NOT NULL,
 		provider varchar(30) NOT NULL,
 		rate float(8,4) NOT NULL,
 		created_at timestamp DEFAULT CURRENT_TIMESTAMP 
@@ -170,7 +183,7 @@ func (m mysqlStorage) Migrate() error {
 		return err
 	}
 
-	_, err = m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE INDEX IF NOT EXISTS search_index ON %s(fetchers, provider, created_at);`, m.tableName))
+	_, err = m.db.ExecContext(m.ctx, fmt.Sprintf(`CREATE INDEX IF NOT EXISTS search_index ON %s(currency, provider, created_at);`, m.tableName))
 	return err
 }
 

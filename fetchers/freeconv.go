@@ -3,6 +3,7 @@ package fetchers
 import (
 	"context"
 	"encoding/json"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -89,7 +90,10 @@ func (f FreeCurrConvFetcher) fetchCurrencies(
 
 		if strings.Contains(errorRes.Error, "API limit reached") {
 			errorChannel <- ErrAPILimitReached
+			return
 		}
+
+		errorChannel <- errors.Wrap(ErrClient, errorRes.Error)
 
 		return
 	}
@@ -107,17 +111,24 @@ func (f FreeCurrConvFetcher) fetchCurrencies(
 }
 
 func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currencyFetcher.Currency, error) {
-	var wg sync.WaitGroup
+	var wg, appendWg sync.WaitGroup
+	var numberOfRequests int
 
-	var appendWg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
 
-	numberOfRequests := len(currenciesToFetch) / f.MaxPerRequest
+	if len(currenciesToFetch) <= f.MaxPerRequest {
+		numberOfRequests = len(currenciesToFetch)
+	} else {
+		numberOfRequests = len(currenciesToFetch) / f.MaxPerRequest
+	}
+
 	if numberOfRequests >= f.MaxPerHour {
 		return nil, ErrNotEnoughRequests
 	}
 
-	channel := make(chan interface{}, numberOfRequests)
+	channel := make(chan interface{})
 	errorChannel := make(chan error)
+
 	currencies := make([]currencyFetcher.Currency, 0, len(currenciesToFetch))
 
 	client := &http.Client{}
@@ -131,22 +142,33 @@ func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currencyFetche
 	for i := 0; i < numberOfRequests; i++ {
 		wg.Add(1)
 
-		go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+f.MaxPerRequest], channel, errorChannel)
+		if numberOfRequests <= f.MaxPerRequest {
+			go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+1], channel, errorChannel)
+		} else {
+			go f.fetchCurrencies(client, &wg, currenciesToFetch[idx:idx+f.MaxPerRequest], channel, errorChannel)
+		}
 
 		idx += f.MaxPerRequest
 	}
 
-	go func(wg, appendWg *sync.WaitGroup, channel currencyChannel, errorChannel chan<- error) {
+	go func(wg, appendWg *sync.WaitGroup) {
 		wg.Wait()
 		close(channel)
 		appendWg.Wait()
-		errorChannel <- nil
 		close(errorChannel)
-	}(&wg, &appendWg, channel, errorChannel)
+	}(&wg, &appendWg)
 
-	if err := <-errorChannel; err != nil {
-		return nil, err
+	select {
+	case err := <-errorChannel:
+		cancel()
+
+		if err != nil {
+			return nil, err
+		}
+
+		return currencies, nil
+	case <-ctx.Done():
+		cancel()
+		return currencies, nil
 	}
-
-	return currencies, nil
 }

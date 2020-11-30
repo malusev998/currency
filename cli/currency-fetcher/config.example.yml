@@ -6,23 +6,23 @@ fetchers:
     - freecurrconversion
     - exchangeratesapi
   freecurrconversion:
-    url: https://free.currconv.com/api/v7/convert
+    url: 'https://free.currconv.com/api/v7/convert'
     apiKey: 1234
     maxPerHour: 100
     maxPerRequest: 2
   exchangeratesapi:
-    url: ''
+    url: 'https://api.exchangeratesapi.io/latest'
 databases:
   mysql:
     addr: 127.0.0.1:3306
-    user: fetchers
-    password: fetchers
+    user: currency
+    password: currency
     db: currencydb
-    table: fetchers
+    table: currency
   mongo:
     uri: mongodb://localhost:27017
     db: currencydb
-    collection: fetchers
+    collection: currency
 migrate: true
 currencies:
   - EUR_RSD

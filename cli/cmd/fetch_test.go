@@ -51,8 +51,8 @@ func storages(t *testing.T, ctx context.Context) ([]currencyFetcher.Storage, *sq
 	}
 
 	mysqlDriverConfig := mysql.NewConfig()
-	mysqlDriverConfig.User = "fetchers"
-	mysqlDriverConfig.Passwd = "fetchers"
+	mysqlDriverConfig.User = "currency"
+	mysqlDriverConfig.Passwd = "currency"
 	mysqlDriverConfig.DBName = "currencydb"
 
 	mysqlDriverConfig.Net = "tcp"
@@ -70,7 +70,7 @@ func storages(t *testing.T, ctx context.Context) ([]currencyFetcher.Storage, *sq
 		t.FailNow()
 	}
 
-	sqlStorage, _ := storage.NewMySQLStorage(storage.MySQLConfig{
+	sqlStorage, err := storage.NewMySQLStorage(storage.MySQLConfig{
 		BaseConfig: storage.BaseConfig{
 			Cxt:     ctx,
 			Migrate: true,

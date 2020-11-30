@@ -32,6 +32,7 @@ func saveToStorage(
 	mutex.Unlock()
 }
 
+// TODO: Add rollback
 func (f Service) Save(currenciesToFetch []string) (map[string][]currencyFetcher.CurrencyWithID, error) {
 	var wg sync.WaitGroup
 	mutex := &sync.RWMutex{}

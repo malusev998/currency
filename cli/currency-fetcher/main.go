@@ -13,11 +13,22 @@ import (
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	configPath, err := cmd.Init("./config.yml")
+
+	if err != nil {
+		log.Fatalf("Error while initializing ")
+	}
+
+	viper.SetConfigFile(configPath)
+	viper.SetEnvPrefix("CURRENCY_FETCHER")
+	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error while reading in the config file: %v\n", err)
 	}
+
+	defer cancel()
 
 	config, err := getConfig(ctx)
 
@@ -57,7 +68,7 @@ func main() {
 
 	for _, st := range storages {
 		if err := st.Close(); err != nil {
-			log.Printf("Error while closing the storage %s: %v\n", st.GetStorageProviderName(), err)
+			log.Fatalf("Error while closing the storage %s: %v\n", st.GetStorageProviderName(), err)
 		}
 	}
 }
