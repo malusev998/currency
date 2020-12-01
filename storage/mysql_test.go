@@ -5,21 +5,21 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/malusev998/currency/storage"
 	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bxcodec/faker/v3"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	currency_fetcher "github.com/malusev998/currency"
+	"github.com/malusev998/currency"
+	"github.com/malusev998/currency/storage"
 )
 
 type (
@@ -136,7 +136,7 @@ func TestMySQL_InsertOne(t *testing.T) {
 	})
 	defer storage.Drop()
 
-	currencies, err := storage.Store([]currency_fetcher.Currency{
+	currencies, err := storage.Store([]currency.Currency{
 		{
 			From:      "EUR",
 			To:        "USD",
@@ -167,7 +167,7 @@ func TestMySQL_InsertMany(t *testing.T) {
 	})
 	defer storage.Drop()
 
-	currencies, err := storage.Store([]currency_fetcher.Currency{
+	currencies, err := storage.Store([]currency.Currency{
 		{
 			From:      "EUR",
 			To:        "USD",
@@ -219,7 +219,7 @@ func TestMysqlStorage_Store(t *testing.T) {
 			TableName:        "currency_store_test",
 			IDGenerator:      gen,
 		})
-		currencies, err := st.Store([]currency_fetcher.Currency{
+		currencies, err := st.Store([]currency.Currency{
 			{
 				From:      "EUR",
 				To:        "USD",
@@ -245,7 +245,7 @@ func TestMysqlStorage_StoreUnit(t *testing.T) {
 	generator := &IDGeneratorMock{}
 	st, _ := storage.NewSQLStorage(ctx, db, generator, "currency_store_test_unit", false)
 
-	currencies := []currency_fetcher.Currency{
+	currencies := []currency.Currency{
 		{
 			From:      "EUR",
 			To:        "USD",
