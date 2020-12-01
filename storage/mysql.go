@@ -106,7 +106,7 @@ func (m mysqlStorage) Store(currency []currencyFetcher.Currency) ([]currencyFetc
 }
 
 func (m mysqlStorage) Get(from, to string, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
-	return m.GetByProvider(from, to, "", page, perPage)
+	return m.GetByProvider(from, to, currencyFetcher.EmptyProvider, page, perPage)
 }
 
 func (m mysqlStorage) GetByProvider(from, to string, provider currencyFetcher.Provider, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
@@ -114,7 +114,7 @@ func (m mysqlStorage) GetByProvider(from, to string, provider currencyFetcher.Pr
 }
 
 func (m mysqlStorage) GetByDate(from, to string, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
-	return m.GetByDateAndProvider(from, to, "", start, end, page, perPage)
+	return m.GetByDateAndProvider(from, to, currencyFetcher.EmptyProvider, start, end, page, perPage)
 }
 
 func (m mysqlStorage) GetByDateAndProvider(from, to string, provider currencyFetcher.Provider, start, end time.Time, page, perPage int64) ([]currencyFetcher.CurrencyWithID, error) {
@@ -201,6 +201,23 @@ func (m *mysqlStorage) Close() error {
 func (m mysqlStorage) Drop() error {
 	_, err := m.db.ExecContext(m.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", m.tableName))
 	return err
+}
+
+func NewSQLStorage(ctx context.Context, db *sql.DB, generator IDGenerator, tableName string, migrate bool) (currencyFetcher.Storage, error) {
+	storage := &mysqlStorage{
+		idGenerator: generator,
+		ctx:         ctx,
+		db:          db,
+		tableName:   tableName,
+	}
+
+	if migrate {
+		if err := storage.Migrate(); err != nil {
+			return nil, fmt.Errorf("error while migrating mysql database: %v", err)
+		}
+	}
+
+	return storage, nil
 }
 
 func NewMySQLStorage(c MySQLConfig) (currencyFetcher.Storage, error) {

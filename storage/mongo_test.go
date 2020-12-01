@@ -2,7 +2,7 @@ package storage_test
 
 import (
 	"context"
-	"github.com/malusev998/currency/storage"
+	"github.com/malusev998/currency"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/rand"
 	"os"
@@ -13,147 +13,132 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	currencyFetcher "github.com/malusev998/currency"
+	"github.com/malusev998/currency/storage"
 )
 
-func TestStoreInMongo(t *testing.T) {
-	t.Parallel()
-	runningInDocker := false
-
-	if os.Getenv("RUNNING_IN_DOCKER") != "" {
-		runningInDocker = true
-	}
-
-	ctx := context.Background()
-	asserts := require.New(t)
-
+func getMongoURI() string {
 	uri := "mongodb://localhost:27017"
 
-	if runningInDocker {
+	if os.Getenv("RUNNING_IN_DOCKER") != "" {
 		uri = "mongodb://mongo:27017"
 	}
 
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	return uri
+}
 
-	asserts.Nil(err)
-	asserts.NotNil(client)
+func getMongoDB(dbName string) (*mongo.Client, *mongo.Database) {
+	client, _ := mongo.NewClient(options.Client().ApplyURI(getMongoURI()))
+	db := client.Database(dbName)
+	client.Connect(context.Background())
+	return client, db
+}
 
-	err = client.Connect(ctx)
-
-	asserts.Nil(err)
-
-	defer client.Disconnect(ctx)
-
-	t.Run("StoreOne", func(t *testing.T) {
-		database := client.Database("currency_fetcher_store_one")
-		defer database.Drop(ctx)
-
-		storage, _ := storage.NewMongoStorage(storage.MongoDBConfig{
-			BaseConfig: storage.BaseConfig{
-				Cxt:     ctx,
-				Migrate: true,
-			},
-			ConnectionString: uri,
-			Database:         "currency_fetcher_store_one",
-			Collection:       "fetchers",
-		})
-		defer storage.Drop()
-
-		provider := currencyFetcher.Provider("TestProvider")
-
-		currencies, err := storage.Store([]currencyFetcher.Currency{
-			{
-				From:     "EUR",
-				To:       "USD",
-				Provider: provider,
-				Rate:     0.8,
-			},
-		})
-
-		asserts.Nil(err)
-		asserts.Len(currencies, 1)
-		asserts.NotNil(currencies[0].ID)
-		asserts.Equal("EUR", currencies[0].From)
-		asserts.Equal("USD", currencies[0].To)
-		asserts.Equal(provider, currencies[0].Provider)
-		asserts.Equal(float32(0.8), currencies[0].Rate)
+func TestGetStorageProviderName(t *testing.T) {
+	assert := require.New(t)
+	st, _ := storage.NewMongoStorage(storage.MongoDBConfig{
+		BaseConfig: storage.BaseConfig{
+			Cxt:     context.Background(),
+			Migrate: true,
+		},
+		ConnectionString: getMongoURI(),
+		Database:         "currency_fetcher_store_one",
+		Collection:       "fetchers",
 	})
 
-	t.Run("StoreMany", func(t *testing.T) {
-		database := client.Database("currency_fetcher_store_many")
-		defer database.Drop(ctx)
+	assert.Equal(storage.MongoDBProviderName, st.GetStorageProviderName())
+}
 
-		storage, _ := storage.NewMongoStorage(storage.MongoDBConfig{
-			BaseConfig: storage.BaseConfig{
-				Cxt:     ctx,
-				Migrate: true,
-			},
-			ConnectionString: uri,
-			Database:         "currency_fetcher_store_many",
-			Collection:       "fetchers",
-		})
-		defer storage.Drop()
+func TestStoreOne(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	assert := require.New(t)
 
-		currencies, err := storage.Store([]currencyFetcher.Currency{
-			{
-				From:      "EUR",
-				To:        "USD",
-				Provider:  "TestProvider",
-				Rate:      0.8,
-				CreatedAt: time.Now().Add(time.Duration(10) * time.Minute),
-			},
-			{
-				From:     "EUR",
-				To:       "USD",
-				Provider: "TestProvider",
-				Rate:     0.8,
-			},
-		})
-
-		asserts.Nil(err)
-		asserts.Len(currencies, 2)
-		for _, cur := range currencies {
-			asserts.NotNil(cur.ID)
-			asserts.Equal("EUR", cur.From)
-			asserts.Equal("USD", cur.To)
-			asserts.Equal(currencyFetcher.Provider("TestProvider"), cur.Provider)
-			asserts.Equal(float32(0.8), cur.Rate)
-		}
+	st, _ := storage.NewMongoStorage(storage.MongoDBConfig{
+		BaseConfig: storage.BaseConfig{
+			Cxt:     ctx,
+			Migrate: true,
+		},
+		ConnectionString: getMongoURI(),
+		Database:         "currency_fetcher_store_one",
+		Collection:       "fetchers",
 	})
+	defer st.Drop()
+	defer st.Close()
+
+	provider := currency.Provider("TestProvider")
+
+	currencies, err := st.Store([]currency.Currency{
+		{
+			From:     "EUR",
+			To:       "USD",
+			Provider: provider,
+			Rate:     0.8,
+		},
+	})
+
+	assert.Nil(err)
+	assert.Len(currencies, 1)
+	assert.NotNil(currencies[0].ID)
+	assert.Equal("EUR", currencies[0].From)
+	assert.Equal("USD", currencies[0].To)
+	assert.Equal(provider, currencies[0].Provider)
+	assert.Equal(float32(0.8), currencies[0].Rate)
+}
+
+func TestStoreMany(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+	st, _ := storage.NewMongoStorage(storage.MongoDBConfig{
+		BaseConfig: storage.BaseConfig{
+			Cxt:     context.Background(),
+			Migrate: true,
+		},
+		ConnectionString: getMongoURI(),
+		Database:         "currency_fetcher_store_many",
+		Collection:       "fetchers",
+	})
+	defer st.Drop()
+	defer st.Close()
+
+	currencies, err := st.Store([]currency.Currency{
+		{
+			From:      "EUR",
+			To:        "USD",
+			Provider:  "TestProvider",
+			Rate:      0.8,
+			CreatedAt: time.Now().Add(time.Duration(10) * time.Minute),
+		},
+		{
+			From:     "EUR",
+			To:       "USD",
+			Provider: "TestProvider",
+			Rate:     0.8,
+		},
+	})
+
+	assert.Nil(err)
+	assert.Len(currencies, 2)
+	for _, cur := range currencies {
+		assert.NotNil(cur.ID)
+		assert.Equal("EUR", cur.From)
+		assert.Equal("USD", cur.To)
+		assert.Equal(currency.Provider("TestProvider"), cur.Provider)
+		assert.Equal(float32(0.8), cur.Rate)
+	}
 }
 
 func TestGetCurrenciesFromMongoDb(t *testing.T) {
 	t.Parallel()
-	runningInDocker := false
-	provider := currencyFetcher.Provider("TestProvider")
-	otherProvider := currencyFetcher.Provider("OtherProvider")
-
-	if os.Getenv("RUNNING_IN_DOCKER") != "" {
-		runningInDocker = true
-	}
+	provider := currency.Provider("TestProvider")
+	otherProvider := currency.Provider("OtherProvider")
 
 	ctx := context.Background()
-	asserts := require.New(t)
+	assert := require.New(t)
 
-	uri := "mongodb://localhost:27017"
+	_, db := getMongoDB("currency_fetcher_fetch")
 
-	if runningInDocker {
-		uri = "mongodb://mongo:27017"
-	}
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-
-	asserts.Nil(err)
-	asserts.NotNil(client)
-
-	err = client.Connect(ctx)
-
-	asserts.Nil(err)
-
-	defer client.Disconnect(ctx)
-
-	database := client.Database("currency_fetcher_fetch")
-	defer database.Drop(ctx)
-	collection := database.Collection("fetchers")
+	collection := db.Collection("fetchers")
+	defer db.Drop(ctx)
 
 	var currenciesToInsert []interface{}
 
@@ -166,32 +151,30 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 		})
 	}
 	results, err := collection.InsertMany(ctx, currenciesToInsert)
-	asserts.NotNil(results)
-	asserts.Nil(err)
-
-	defer collection.Drop(ctx)
+	assert.NotNil(results)
+	assert.Nil(err)
 
 	t.Run("GetAllCurrenciesPaginated", func(t *testing.T) {
-		storage, _ := storage.NewMongoStorage(storage.MongoDBConfig{
+		st, _ := storage.NewMongoStorage(storage.MongoDBConfig{
 			BaseConfig: storage.BaseConfig{
-				Cxt:     ctx,
+				Cxt:     context.Background(),
 				Migrate: false,
 			},
-			ConnectionString: uri,
+			ConnectionString: getMongoURI(),
 			Database:         "currency_fetcher_fetch",
 			Collection:       "fetchers",
 		})
-		currencies, err := storage.Get("EUR", "USD", 1, 10)
-		asserts.Nil(err)
-		asserts.NotNil(currencies)
-		asserts.Len(currencies, 10)
+		currencies, err := st.Get("EUR", "USD", 1, 10)
+		assert.Nil(err)
+		assert.NotNil(currencies)
+		assert.Len(currencies, 10)
 
 		for _, cur := range currencies {
-			asserts.NotNil(cur.ID)
-			asserts.IsType(primitive.ObjectID{}, cur.ID)
-			asserts.Equal(provider, cur.Provider)
-			asserts.Equal("EUR", cur.From)
-			asserts.Equal("USD", cur.To)
+			assert.NotNil(cur.ID)
+			assert.IsType(primitive.ObjectID{}, cur.ID)
+			assert.Equal(provider, cur.Provider)
+			assert.Equal("EUR", cur.From)
+			assert.Equal("USD", cur.To)
 		}
 	})
 
@@ -201,19 +184,19 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 				Cxt:     ctx,
 				Migrate: false,
 			},
-			ConnectionString: uri,
+			ConnectionString: getMongoURI(),
 			Database:         "currency_fetcher_fetch",
 			Collection:       "fetchers",
 		})
 		currencies, err := st.GetByProvider("EUR", "USD", provider, 1, 10)
-		asserts.Nil(err)
-		asserts.NotNil(currencies)
-		asserts.Len(currencies, 10)
+		assert.Nil(err)
+		assert.NotNil(currencies)
+		assert.Len(currencies, 10)
 
 		for _, cur := range currencies {
-			asserts.Equal(provider, cur.Provider)
-			asserts.Equal("EUR", cur.From)
-			asserts.Equal("USD", cur.To)
+			assert.Equal(provider, cur.Provider)
+			assert.Equal("EUR", cur.From)
+			assert.Equal("USD", cur.To)
 		}
 	})
 
@@ -223,15 +206,15 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 				Cxt:     ctx,
 				Migrate: false,
 			},
-			ConnectionString: uri,
+			ConnectionString: getMongoURI(),
 			Database:         "currency_fetcher_fetch",
 			Collection:       "fetchers",
 		})
 
 		currencies, err := st.GetByProvider("EUR", "USD", "NonExistentProvider", 1, 10)
-		asserts.Nil(err)
-		asserts.NotNil(currencies)
-		asserts.Len(currencies, 0)
+		assert.Nil(err)
+		assert.NotNil(currencies)
+		assert.Len(currencies, 0)
 	})
 
 	t.Run("GetWithDate", func(t *testing.T) {
@@ -248,8 +231,8 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 		}
 
 		results, err := collection.InsertMany(ctx, toInsert)
-		asserts.NotNil(results)
-		asserts.Nil(err)
+		assert.NotNil(results)
+		assert.Nil(err)
 
 		inFuture := now.Add(time.Duration(10) * time.Minute)
 		st, _ := storage.NewMongoStorage(storage.MongoDBConfig{
@@ -257,13 +240,13 @@ func TestGetCurrenciesFromMongoDb(t *testing.T) {
 				Cxt:     ctx,
 				Migrate: false,
 			},
-			ConnectionString: uri,
+			ConnectionString: getMongoURI(),
 			Database:         "currency_fetcher_fetch",
 			Collection:       "fetchers",
 		})
 		currencies, err := st.GetByDate("EUR", "USD", inFuture.Add(time.Duration(-5)*time.Minute), inFuture, 1, 10)
-		asserts.Nil(err)
-		asserts.NotNil(currencies)
-		asserts.Len(currencies, 5)
+		assert.Nil(err)
+		assert.NotNil(currencies)
+		assert.Len(currencies, 5)
 	})
 }

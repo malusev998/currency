@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/malusev998/currency/storage"
 	"math/rand"
 	"os"
@@ -202,39 +203,76 @@ func TestMySQL_InsertMany(t *testing.T) {
 
 func TestMysqlStorage_Store(t *testing.T) {
 	t.Parallel()
+	asserts := require.New(t)
+	generators := []storage.IDGenerator{
+		&IDGeneratorWithNullBytes{},
+		&IDGeneratorWithLessBytes{},
+	}
 
-	t.Run("Not enough bytes in id generator", func(t *testing.T) {
-		t.Parallel()
-		asserts := require.New(t)
-		generators := []storage.IDGenerator{
-			&IDGeneratorWithNullBytes{},
-			&IDGeneratorWithLessBytes{},
-		}
+	for _, gen := range generators {
+		st, _ := storage.NewMySQLStorage(storage.MySQLConfig{
+			BaseConfig: storage.BaseConfig{
+				Cxt:     context.Background(),
+				Migrate: true,
+			},
+			ConnectionString: mysqlConnectionString(),
+			TableName:        "currency_store_test",
+			IDGenerator:      gen,
+		})
+		currencies, err := st.Store([]currency_fetcher.Currency{
+			{
+				From:      "EUR",
+				To:        "USD",
+				Provider:  "TestProvider",
+				Rate:      0.021,
+				CreatedAt: time.Now(),
+			},
+		})
 
-		for _, gen := range generators {
-			st, _ := storage.NewMySQLStorage(storage.MySQLConfig{
-				BaseConfig: storage.BaseConfig{
-					Cxt:     context.Background(),
-					Migrate: true,
-				},
-				ConnectionString: mysqlConnectionString(),
-				TableName:        "currency_store_test",
-				IDGenerator:      gen,
-			})
-			currencies, err := st.Store([]currency_fetcher.Currency{
-				{
-					From:      "EUR",
-					To:        "USD",
-					Provider:  "TestProvider",
-					Rate:      0.021,
-					CreatedAt: time.Now(),
-				},
-			})
+		asserts.Nil(currencies)
+		asserts.NotNil(err)
+		asserts.True(errors.Is(err, storage.ErrNotEnoughBytesInGenerator))
+		_ = st.Drop()
+	}
+}
 
-			asserts.Nil(currencies)
-			asserts.NotNil(err)
-			asserts.True(errors.Is(err, storage.ErrNotEnoughBytesInGenerator))
-			_ = st.Drop()
-		}
+func TestMysqlStorage_StoreUnit(t *testing.T) {
+	t.Parallel()
+	db, mock, _ := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	defer db.Close()
+	assert := require.New(t)
+	ctx := context.Background()
+	generator := &IDGeneratorMock{}
+	st, _ := storage.NewSQLStorage(ctx, db, generator, "currency_store_test_unit", false)
+
+	currencies := []currency_fetcher.Currency{
+		{
+			From:      "EUR",
+			To:        "USD",
+			Provider:  "TestProvider",
+			Rate:      0.021,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	t.Run("Transaction_Not_Started", func(t *testing.T) {
+		mock.ExpectBegin().WillReturnError(errors.New("error while starting transaction"))
+		_, err := st.Store(currencies)
+		assert.Error(err)
+		assert.Nil(mock.ExpectationsWereMet())
+		assert.Equal("error while starting transaction", err.Error())
 	})
+
+	t.Run("Prepare_SQL_WithError", func(t *testing.T) {
+		mock.ExpectBegin()
+		mock.ExpectPrepare("INSERT INTO currency_store_test_unit(id, currency, provider, rate, created_at) VALUES (?,?,?,?,?);").
+			WillReturnError(errors.New("cannot create prepare statement"))
+		mock.ExpectRollback()
+
+		_, err := st.Store(currencies)
+		assert.Nil(mock.ExpectationsWereMet())
+		assert.Error(err)
+		assert.Equal("cannot create prepare statement", err.Error())
+	})
+
 }

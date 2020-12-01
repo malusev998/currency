@@ -124,6 +124,7 @@ func (m mongoStorage) Migrate() error {
 			return fmt.Errorf("error while creating mongodb collection: %v", err)
 		}
 	}
+
 	_, err := m.collection.Indexes().CreateOne(m.ctx, mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{
