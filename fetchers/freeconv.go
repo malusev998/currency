@@ -115,6 +115,7 @@ func (f FreeCurrConvFetcher) Fetch(currenciesToFetch []string) ([]currencyFetche
 	var numberOfRequests int
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	if len(currenciesToFetch) < f.MaxPerRequest {
 		numberOfRequests = len(currenciesToFetch)

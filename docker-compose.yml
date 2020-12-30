@@ -24,24 +24,6 @@ services:
       MYSQL_DATABASE: currencydb
       MYSQL_ROOT_HOST: '%'
     restart: unless-stopped
-#  standalone_fetcher:
-#    build:
-#      context: .
-#      dockerfile: ./docker/Dockerfile-fetching
-#    networks:
-#      - currency_fetcher
-#    restart: unless-stopped
-#    volumes:
-#      - ./cli/fetchers-fetcher/config.yml:/fetchers-fetcher/config.yml
-#    depends_on:
-#      - mongo
-#      - mysql
-#    links:
-#      - mongo
-#      - mysql
-#    environment:
-#      DEBUG: 0
-#      AFTER: 1h0m0s
 networks:
   currency_fetcher:
     driver: bridge

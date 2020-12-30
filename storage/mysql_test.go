@@ -26,28 +26,14 @@ type (
 	IDGeneratorMock struct {
 		mock.Mock
 	}
-	IDGeneratorWithNullBytes struct {
-		mock.Mock
-	}
-	IDGeneratorWithLessBytes struct {
-		mock.Mock
-	}
 )
 
-func (i *IDGeneratorWithNullBytes) Generate() []byte {
-	return nil
-}
-
-func (i *IDGeneratorWithLessBytes) Generate() []byte {
-	bytes := make([]byte, 10)
-	_, _ = rand.Read(bytes)
-
-	return bytes
-}
-
 func (i *IDGeneratorMock) Generate() []byte {
-	bytes, _ := uuid.MustParse("8f8fa9e1-f854-4c94-9316-cdc561c8f536").MarshalBinary()
-	return bytes
+	args := i.Called()
+	if value, ok := args.Get(0).([]byte); ok {
+		return value
+	}
+	return nil
 }
 
 func mysqlConnectionString() string {
@@ -124,19 +110,17 @@ func TestMySQL_InsertOne(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	asserts := require.New(t)
-	generator := &IDGeneratorMock{}
-	storage, _ := storage.NewMySQLStorage(storage.MySQLConfig{
+	st, _ := storage.NewMySQLStorage(storage.MySQLConfig{
 		BaseConfig: storage.BaseConfig{
 			Cxt:     ctx,
 			Migrate: true,
 		},
 		ConnectionString: mysqlConnectionString(),
 		TableName:        "currency_store_test_insert",
-		IDGenerator:      generator,
 	})
-	defer storage.Drop()
+	defer st.Drop()
 
-	currencies, err := storage.Store([]currency.Currency{
+	currencies, err := st.Store([]currency.Currency{
 		{
 			From:      "EUR",
 			To:        "USD",
@@ -156,7 +140,7 @@ func TestMySQL_InsertMany(t *testing.T) {
 	t.Parallel()
 
 	asserts := require.New(t)
-	storage, _ := storage.NewMySQLStorage(storage.MySQLConfig{
+	st, _ := storage.NewMySQLStorage(storage.MySQLConfig{
 		BaseConfig: storage.BaseConfig{
 			Cxt:     context.Background(),
 			Migrate: true,
@@ -165,9 +149,9 @@ func TestMySQL_InsertMany(t *testing.T) {
 		TableName:        "currency_store_test_insert_many",
 		IDGenerator:      nil,
 	})
-	defer storage.Drop()
+	defer st.Drop()
 
-	currencies, err := storage.Store([]currency.Currency{
+	currencies, err := st.Store([]currency.Currency{
 		{
 			From:      "EUR",
 			To:        "USD",
@@ -204,9 +188,14 @@ func TestMySQL_InsertMany(t *testing.T) {
 func TestMysqlStorage_Store(t *testing.T) {
 	t.Parallel()
 	asserts := require.New(t)
+	idNullBytes := &IDGeneratorMock{}
+	idLessBytes := &IDGeneratorMock{}
+
+	idNullBytes.On("Generate").Return(nil)
+	idLessBytes.On("Generate").Return(make([]byte, 10))
 	generators := []storage.IDGenerator{
-		&IDGeneratorWithNullBytes{},
-		&IDGeneratorWithLessBytes{},
+		idNullBytes,
+		idLessBytes,
 	}
 
 	for _, gen := range generators {
@@ -238,12 +227,11 @@ func TestMysqlStorage_Store(t *testing.T) {
 
 func TestMysqlStorage_StoreUnit(t *testing.T) {
 	t.Parallel()
-	db, mock, _ := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	db, m, _ := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	defer db.Close()
 	assert := require.New(t)
 	ctx := context.Background()
-	generator := &IDGeneratorMock{}
-	st, _ := storage.NewSQLStorage(ctx, db, generator, "currency_store_test_unit", false)
+	st, _ := storage.NewSQLStorage(ctx, db, nil, "currency_store_test_unit", false)
 
 	currencies := []currency.Currency{
 		{
@@ -256,21 +244,21 @@ func TestMysqlStorage_StoreUnit(t *testing.T) {
 	}
 
 	t.Run("Transaction_Not_Started", func(t *testing.T) {
-		mock.ExpectBegin().WillReturnError(errors.New("error while starting transaction"))
+		m.ExpectBegin().WillReturnError(errors.New("error while starting transaction"))
 		_, err := st.Store(currencies)
 		assert.Error(err)
-		assert.Nil(mock.ExpectationsWereMet())
+		assert.Nil(m.ExpectationsWereMet())
 		assert.Equal("error while starting transaction", err.Error())
 	})
 
 	t.Run("Prepare_SQL_WithError", func(t *testing.T) {
-		mock.ExpectBegin()
-		mock.ExpectPrepare("INSERT INTO currency_store_test_unit(id, currency, provider, rate, created_at) VALUES (?,?,?,?,?);").
+		m.ExpectBegin()
+		m.ExpectPrepare("INSERT INTO currency_store_test_unit(id, currency, provider, rate, created_at) VALUES (?,?,?,?,?);").
 			WillReturnError(errors.New("cannot create prepare statement"))
-		mock.ExpectRollback()
+		m.ExpectRollback()
 
 		_, err := st.Store(currencies)
-		assert.Nil(mock.ExpectationsWereMet())
+		assert.Nil(m.ExpectationsWereMet())
 		assert.Error(err)
 		assert.Equal("cannot create prepare statement", err.Error())
 	})

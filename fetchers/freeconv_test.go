@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	currency_fetcher "github.com/malusev998/currency"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	currency_fetcher "github.com/malusev998/currency"
 )
 
 type (
@@ -20,17 +21,17 @@ type (
 	httpServerError         struct{}
 )
 
-func (h httpServerError) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (h httpServerError) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
 	writer.WriteHeader(503)
-	writer.Write([]byte("{\"error\": \"On vacation\", \"status\": 503}"))
+	_, _ = writer.Write([]byte("{\"error\": \"On vacation\", \"status\": 503}"))
 }
 
-func (h httpClientError) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (h httpClientError) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
 	writer.WriteHeader(422)
-	writer.Write([]byte("{\"error\": \"Validation error.\", \"status\": 422}"))
+	_, _ = writer.Write([]byte("{\"error\": \"Validation error.\", \"status\": 422}"))
 }
 
-func (h httpHandlerLimitReached) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
+func (h httpHandlerLimitReached) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
 	writer.WriteHeader(400)
 	_, _ = writer.Write([]byte("{\"error\": \"Free API limit reached.\", \"status\": 400}"))
 }

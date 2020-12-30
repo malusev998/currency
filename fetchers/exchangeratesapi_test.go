@@ -8,6 +8,7 @@ import (
 )
 
 func TestExchangeRatesAPIFetcher_PrepareISOCurrencies(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	api := fetchers.ExchangeRatesAPIFetcher{Ctx: context.Background()}
 
