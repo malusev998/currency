@@ -11,13 +11,18 @@ type Service struct {
 	Storage []currencyFetcher.Storage
 }
 
+
+type currencyCh struct {
+	StorageName string
+	Currency []currencyFetcher.CurrencyWithID
+}
+
 func saveToStorage(
 	wg *sync.WaitGroup,
 	currencies []currencyFetcher.Currency,
-	data *map[string][]currencyFetcher.CurrencyWithID,
 	storage currencyFetcher.Storage,
+	cs chan<- currencyCh,
 	errorChannel chan<- error,
-	mutex sync.Locker,
 ) {
 	defer wg.Done()
 	c, err := storage.Store(currencies)
@@ -27,33 +32,39 @@ func saveToStorage(
 		return
 	}
 
-	mutex.Lock()
-	(*data)[storage.GetStorageProviderName()] = c
-	mutex.Unlock()
+	cs <- currencyCh{
+		StorageName: storage.GetStorageProviderName(),
+		Currency: c,
+	}
 }
 
-// TODO: Add rollback
 func (f Service) Save(currenciesToFetch []string) (map[string][]currencyFetcher.CurrencyWithID, error) {
 	var wg sync.WaitGroup
-	mutex := &sync.RWMutex{}
-
 	fetchedCurrencies, err := f.Fetcher.Fetch(currenciesToFetch)
 	if err != nil {
 		return nil, err
 	}
 
+	cs := make(chan currencyCh, len(currenciesToFetch))
 	errorChannel := make(chan error)
 	data := make(map[string][]currencyFetcher.CurrencyWithID)
 
 	wg.Add(len(f.Storage))
+
 	for _, storage := range f.Storage {
-		go saveToStorage(&wg, fetchedCurrencies, &data, storage, errorChannel, mutex)
+		go saveToStorage(&wg, fetchedCurrencies, storage, cs, errorChannel)
 	}
 
-	go func(wg *sync.WaitGroup, errorChannel chan error) {
+	go func(wg *sync.WaitGroup, cs chan currencyCh, errorChannel chan error) {
 		wg.Wait()
 		close(errorChannel)
-	}(&wg, errorChannel)
+		close(cs)
+	}(&wg, cs, errorChannel)
+
+
+	for item := range cs {
+		data[item.StorageName] = item.Currency
+	}
 
 	if err, more := <-errorChannel; more {
 		return nil, err
